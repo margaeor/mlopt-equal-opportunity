@@ -1,2 +1,3 @@
 data/dataset/*.csv
 data/output/*.csv
+data/metadata/*.xlsx
