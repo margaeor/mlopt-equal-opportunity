@@ -11,8 +11,18 @@ DATA_PATH = 'data'
 DATASET_PATH = os.path.join(DATA_PATH, 'dataset')
 METADATA_PATH = os.path.join(DATA_PATH, 'metadata')
 OUTPUT_PATH = os.path.join(DATA_PATH, 'output')
-DATASET_NAME = 'psam_pusa.csv'
+
+DATASET_URLS = [
+    "https://www2.census.gov/programs-surveys/acs/data/pums/2019/1-Year/csv_pus.zip",
+    "https://www2.census.gov/programs-surveys/acs/data/pums/2019/1-Year/csv_hus.zip"
+]
+
 DEBUG = False
+
+PERSON_DATASETS = ['psam_pusa.csv', 'psam_pusb.csv']
+HOUSEHOLD_DATASETS = ['psam_husa.csv', 'psam_husb.csv']
+
+JOIN_COLUMN = 'SERIALNO'
 
 def download_and_extract_zip(url, output):
     with requests.get(url) as file:
@@ -22,17 +32,20 @@ def download_and_extract_zip(url, output):
 
 if __name__ == '__main__':
 
-    dataset = os.path.join(DATASET_PATH, DATASET_NAME)
 
     # If dataset doesn't exist, download it and extract it
-    if not os.path.exists(dataset):
-        print("Downloading dataset")
-        download_and_extract_zip(
-            "https://www2.census.gov/programs-surveys/acs/data/pums/2019/1-Year/csv_pus.zip",
-            DATASET_PATH
-        )
+    for url, datasets in zip(DATASET_URLS, [PERSON_DATASETS, HOUSEHOLD_DATASETS]):
+        for dataset in datasets:
+            if not DEBUG and not os.path.exists(os.path.join(DATASET_PATH, dataset)):
+                print(f"Downloading dataset {dataset}")
+                download_and_extract_zip(
+                    "https://www2.census.gov/programs-surveys/acs/data/pums/2019/1-Year/csv_hus.zip",
+                    DATASET_PATH
+                )
 
-    if DEBUG: DATASET_NAME = 'test.csv'
+    if DEBUG:
+        PERSON_DATASETS = ['test_pa.csv', 'test_pb.csv']
+        HOUSEHOLD_DATASETS = ['test_ha.csv', 'test_hb.csv']
 
     # Import mappings of columns
     col_mapper = pd.read_csv(os.path.join(METADATA_PATH, 'columns.csv'))
@@ -42,18 +55,32 @@ if __name__ == '__main__':
     variable_aliases = list(col_mapper['VariableRename'])
     variable_descriptions = list(col_mapper['VariableRename'])
 
-    # Read dataset
-    print("Reading dataset")
-    df = pd.read_csv(os.path.join(DATASET_PATH, DATASET_NAME))
+    variables += [JOIN_COLUMN]
+    cols_v = set(variables)
+
+    # Read datasets
+    print("Reading datasets")
+    dfs = [pd.read_csv(os.path.join(DATASET_PATH, pdt)) for pdt in PERSON_DATASETS]
+    dfp = pd.concat(dfs)
+    cols_p = set(dfp.columns)
+    dfp = dfp[cols_p & cols_v]
+
+    dfs = [pd.read_csv(os.path.join(DATASET_PATH, pdt)) for pdt in HOUSEHOLD_DATASETS]
+    dfh = pd.concat(dfs)
+    cols_h = set(dfh.columns)
+    dfh = dfh[(cols_v-cols_p).union({JOIN_COLUMN})]
+
     #df = pd.read_csv(os.path.join(DATASET_PATH, 'test.csv'))
 
-    sa = set(df.columns)
-    sb = set(variables)
 
-    print(f"Columns that don't exist{sb-sa}")
+    print(f"Columns that don't exist in Person {cols_v-cols_p}")
+
+    print(f"Shape before merge {dfp.shape}")
+    df = dfp.merge(dfh, how='inner', on=JOIN_COLUMN)
+    print(f"Shape after merge {df.shape}")
 
     # Extract columns and rename
-    df = df[sa & sb].rename(columns={k: v for k, v in zip(variables, variable_aliases)})
+    df = df.rename(columns={k: v for k, v in zip(variables, variable_aliases)})
 
 
     df.to_csv(os.path.join(OUTPUT_PATH, 'out.csv'), index=False)
