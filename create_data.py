@@ -50,7 +50,7 @@ if __name__ == '__main__':
     # Extract variables, variable aliases and descriptions
     variables = list(col_mapper['Variable'])
     variable_aliases = list(col_mapper['VariableRename'])
-    variable_descriptions = list(col_mapper['VariableRename'])
+    variable_descriptions = list(col_mapper['Description'])
 
     variables += [JOIN_COLUMN]
     cols_v = set(variables)
