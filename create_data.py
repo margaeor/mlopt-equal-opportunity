@@ -12,7 +12,7 @@ DATASET_PATH = os.path.join(DATA_PATH, 'dataset')
 METADATA_PATH = os.path.join(DATA_PATH, 'metadata')
 OUTPUT_PATH = os.path.join(DATA_PATH, 'output')
 DATASET_NAME = 'psam_pusa.csv'
-
+DEBUG = False
 
 def download_and_extract_zip(url, output):
     with requests.get(url) as file:
@@ -32,6 +32,8 @@ if __name__ == '__main__':
             DATASET_PATH
         )
 
+    if DEBUG: DATASET_NAME = 'test.csv'
+
     # Import mappings of columns
     col_mapper = pd.read_csv(os.path.join(METADATA_PATH, 'columns.csv'))
 
@@ -45,8 +47,13 @@ if __name__ == '__main__':
     df = pd.read_csv(os.path.join(DATASET_PATH, DATASET_NAME))
     #df = pd.read_csv(os.path.join(DATASET_PATH, 'test.csv'))
 
+    sa = set(df.columns)
+    sb = set(variables)
+
+    print(f"Columns that don't exist{sb-sa}")
+
     # Extract columns and rename
-    df = df[variables].rename(columns={k: v for k, v in zip(variables, variable_aliases)})
+    df = df[sa & sb].rename(columns={k: v for k, v in zip(variables, variable_aliases)})
 
 
     df.to_csv(os.path.join(OUTPUT_PATH, 'out.csv'), index=False)
