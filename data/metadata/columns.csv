@@ -1,0 +1,4 @@
+Variable,VariableRename,Description
+PINCP,personal_income,"Total person\'s income (signed, use ADJINC to adjust to constant dollars)"
+AGEP,age,Age
+SCH,school_enrollment,School entrollment
