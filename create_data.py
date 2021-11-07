@@ -1,9 +1,6 @@
-from collections import OrderedDict
 import pandas as pd
 import os
-import zipfile
 from io import BytesIO
-from urllib.request import urlopen
 from zipfile import ZipFile
 import requests
 
