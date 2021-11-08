@@ -54,18 +54,46 @@ if __name__ == '__main__':
 
     variables += [JOIN_COLUMN]
     cols_v = set(variables)
+    
+    ###########################
+    ######## PREVIOUS ########
+    #########################
+    # # Read datasets
+    # print("Reading datasets")
+    # dfs = [pd.read_csv(os.path.join(DATASET_PATH, pdt)) for pdt in PERSON_DATASETS]
+    # dfp = pd.concat(dfs)
+    # cols_p = set(dfp.columns)
+    # dfp = dfp[cols_p & cols_v]
 
+    # dfs = [pd.read_csv(os.path.join(DATASET_PATH, pdt)) for pdt in HOUSEHOLD_DATASETS]
+    # dfh = pd.concat(dfs)
+    # cols_h = set(dfh.columns)
+    # dfh = dfh[(cols_v-cols_p).union({JOIN_COLUMN})]
+
+    ######################
+    ######## NEW ########
+    ####################
     # Read datasets
-    print("Reading datasets")
-    dfs = [pd.read_csv(os.path.join(DATASET_PATH, pdt)) for pdt in PERSON_DATASETS]
-    dfp = pd.concat(dfs)
-    cols_p = set(dfp.columns)
-    dfp = dfp[cols_p & cols_v]
+    # Loop because we cannot load the entire dataset at once, we need to load gradually and reduce columns first
+    dfp_final = pd.DataFrame()
+    dfh_final = pd.DataFrame()
+    for pdt in PERSON_DATASETS:
+        print(f"Reading dataset {pdt}")
+        dfp = pd.read_csv(os.path.join(DATASET_PATH, pdt))
+        # dfp = pd.concat(dfs)
+        cols_p = set(dfp.columns)
+        dfp_final = pd.concat([dfp_final, dfp[cols_p & cols_v].copy()])
 
-    dfs = [pd.read_csv(os.path.join(DATASET_PATH, pdt)) for pdt in HOUSEHOLD_DATASETS]
-    dfh = pd.concat(dfs)
-    cols_h = set(dfh.columns)
-    dfh = dfh[(cols_v-cols_p).union({JOIN_COLUMN})]
+    for hdt in HOUSEHOLD_DATASETS:
+        print(f"Reading dataset {hdt}")
+        dfh = pd.read_csv(os.path.join(DATASET_PATH, hdt)) 
+        # dfh = pd.concat(dfs)
+        cols_h = set(dfh.columns)
+        dfh_final = pd.concat([dfh_final, dfh[(cols_v-cols_p).union({JOIN_COLUMN})].copy()])
+
+    # (thats  a little sketchy but the rest of the stuff use dfp and dfh as names...)
+    dfp = dfp_final
+    dfh = dfh_final
 
     #df = pd.read_csv(os.path.join(DATASET_PATH, 'test.csv'))
 
