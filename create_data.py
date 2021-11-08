@@ -14,7 +14,7 @@ DATASET_URLS = [
     "https://www2.census.gov/programs-surveys/acs/data/pums/2019/1-Year/csv_hus.zip"
 ]
 
-DEBUG = False
+DEBUG = True
 
 PERSON_DATASETS = ['psam_pusa.csv', 'psam_pusb.csv']
 HOUSEHOLD_DATASETS = ['psam_husa.csv', 'psam_husb.csv']
@@ -79,5 +79,8 @@ if __name__ == '__main__':
     # Extract columns and rename
     df = df.rename(columns={k: v for k, v in zip(variables, variable_aliases)})
 
-
+    # Write CSV to output directory (create it if doesn't exist)
+    if not os.path.exists(OUTPUT_PATH):
+        print(f"Creating {OUTPUT_PATH} directory")
+        os.mkdir(OUTPUT_PATH)
     df.to_csv(os.path.join(OUTPUT_PATH, 'out.csv'), index=False)
