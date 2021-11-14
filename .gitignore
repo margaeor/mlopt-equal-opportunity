@@ -5,3 +5,4 @@ debug_python.ipynb
 *.zip
 process_data.py
 .ipynb_checkpoints/*
+__pycache__/*

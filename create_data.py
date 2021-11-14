@@ -3,23 +3,7 @@ import os
 from io import BytesIO
 from zipfile import ZipFile
 import requests
-
-DATA_PATH = 'data'
-DATASET_PATH = os.path.join(DATA_PATH, 'dataset')
-METADATA_PATH = os.path.join(DATA_PATH, 'metadata')
-OUTPUT_PATH = os.path.join(DATA_PATH, 'output')
-
-DATASET_URLS = [
-    "https://www2.census.gov/programs-surveys/acs/data/pums/2019/1-Year/csv_pus.zip",
-    "https://www2.census.gov/programs-surveys/acs/data/pums/2019/1-Year/csv_hus.zip"
-]
-
-DEBUG = False
-
-PERSON_DATASETS = ['psam_pusa.csv', 'psam_pusb.csv']
-HOUSEHOLD_DATASETS = ['psam_husa.csv', 'psam_husb.csv']
-
-JOIN_COLUMN = 'SERIALNO'
+from constants import *
 
 def download_and_extract_zip(url, output):
     with requests.get(url) as file:
@@ -45,7 +29,7 @@ if __name__ == '__main__':
         HOUSEHOLD_DATASETS = ['test_ha.csv', 'test_hb.csv']
 
     # Import mappings of columns
-    col_mapper = pd.read_csv(os.path.join(METADATA_PATH, 'columns.csv'))
+    col_mapper = pd.read_csv(METADATA_FILE)
 
     # Extract variables, variable aliases and descriptions
     variables = list(col_mapper['Variable'])
