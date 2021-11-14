@@ -1,0 +1,11 @@
+ESR,Value,ESR_map,Value_map,toMap,,COW,Value,COW_map,Value_map,toMap
+0,N/A (less than 16 years old),11,,1,,0,N/A (less than 16 years old),15,,1
+1,"Civilian employed, at work",12,,,,1,"Civilian employed, at work",16,,
+2,"Civilian employed, with a job but not at work",12,,,,2,"Civilian employed, with a job but not at work",15,,
+3,Unemployed,12,,,,3,Unemployed,16,,
+4,"Armed Forces, At Work",11,,,,4,"Armed Forces, At Work",15,,
+5,"Armed Forces, With a Job But Not At Work",11,,,,5,"Armed Forces, With a Job But Not At Work",16,,
+6,Not in Labor Force,11,,,,6,Not in Labor Force,17,,
+,,,,,,7,,17,,
+,,,,,,8,,18,,
+,,,,,,9,,18,,

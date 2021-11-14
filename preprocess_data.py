@@ -9,12 +9,37 @@ age_range = (25, 55)
 
 if __name__ == '__main__':
 
-
     df_meta = pd.read_csv(METADATA_FILE)
     df = pd.read_csv(input_file)
 
     # Filter data by age
     df = df.loc[(df.age >= age_range[0]) & (df.age <= age_range[1]), :]
+
+
+    mappings = pd.read_csv(os.path.join(METADATA_PATH,'mapping.csv'))
+    variables_map = [x + '_map' for x in variables]
+    variable_aliases_map = [x + '_map' for x in variable_aliases]
+    mappings = mappings.rename(columns={k: v for k, v in zip(variables, variable_aliases)})
+    mappings = mappings.rename(columns={k: v for k, v in zip(variables_map, variable_aliases_map)})
+
+    output_mapped = pd.DataFrame()
+        
+    for var in variable_aliases:
+        if var in mappings.columns:
+            
+            # print(f"If : {var}")
+            mapFrom = list(mappings[var])
+            mapTo = list(mappings[var+'_map'])
+            initial_data = df[var]
+
+            mapped_data = list(map(lambda x : mapTo[list(mapFrom).index(x)], list(initial_data)))
+            output_mapped[var] = mapped_data
+            print(output_mapped[var])
+            print(mapped_data)
+        else:
+            output_mapped[var] = df[var]
+            # print(f"Else: {var}")
+
 
     categorical_cols = df_meta.loc[df_meta.IsCategorical == 1, 'VariableRename'].to_list()
     non_categorical_cols = df_meta.loc[df_meta.IsCategorical == 0, 'VariableRename'].to_list()

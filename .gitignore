@@ -2,5 +2,7 @@ data/dataset/*.csv
 data/output/*.csv
 data/metadata/*.xlsx
 debug_python.ipynb
+*.zip
+process_data.py
 .ipynb_checkpoints/*
 __pycache__/*
