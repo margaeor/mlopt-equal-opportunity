@@ -14,7 +14,7 @@ DATASET_URLS = [
     "https://www2.census.gov/programs-surveys/acs/data/pums/2019/1-Year/csv_hus.zip"
 ]
 
-DEBUG = True
+DEBUG = False
 
 PERSON_DATASETS = ['psam_pusa.csv', 'psam_pusb.csv']
 HOUSEHOLD_DATASETS = ['psam_husa.csv', 'psam_husb.csv']
