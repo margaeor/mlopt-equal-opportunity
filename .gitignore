@@ -3,3 +3,4 @@ data/output/*.csv
 data/metadata/*.xlsx
 debug_python.ipynb
 .ipynb_checkpoints/*
+__pycache__/*
