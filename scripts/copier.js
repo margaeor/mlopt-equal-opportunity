@@ -36,7 +36,7 @@ function copy_values(id) {
 	var colname = find_colname_from_id(id);
 	var s = colname+id+"\tValue\n";
 	
-	var final_arr = [[colname,'Value']];
+	var final_arr = [[colname,colname+'_desc']];
 	for(let i in arr) final_arr.push(arr[i].split(" -- "));//s += arr[i].replace(" -- ","\t")+"\n";
 	//console.log(arr);
 	//copyToClipboard(s);
@@ -89,6 +89,7 @@ function export_all() {
 				temp = temp.concat(['','']);
 			else
 				temp = temp.concat([results[j][i][0]+'_map',results[j][i][1]+'_map']);
+			temp = temp.concat(['']);
 		}
 		final_result.push(temp);
 	}
@@ -96,5 +97,55 @@ function export_all() {
 	exportCsv(final_result);
 	return final_result;
 }
+function select_cols(lst) {
+	for (let i in lst) {
+		let name = lst[i];
+		var a = $('.ag-center-cols-container').children;
+		for (let j in a) {
+			if(a[i].innerText.includes(name)) {
+				let id = a[i].attributes['row-id'].textContent;//:not(.ag-row-group-expanded)
+				let el = $('.ag-center-cols-container > div[row-id="'+id+'"] > div[col-id="toggleDetail"] button');
+				
+				if (el) {
+					console.log(el);
+					console.log('CLICKING');
+					
+					setTimeout(function(){
+						el.click();
+					}, 100);
+					
+				}
+			}
+		}
+	}
+}
 
-export_all();
+function download_csv(data) {
+	
+	for(let i in data) {
+		for(let j in data[i]) {
+			data[i][j] = data[i][j].replace(/"/g, '""');
+		}
+	}
+	
+    var csv = '';
+    data.forEach(function(row) {
+            csv += '"'+row.join('","')+'"';
+            csv += "\n";
+    });
+ 
+    console.log(csv);
+    var hiddenElement = document.createElement('a');
+    hiddenElement.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv);
+    hiddenElement.target = '_blank';
+    hiddenElement.download = 'people.csv';
+    hiddenElement.click();
+}
+download_csv(export_all());
+
+//select_cols(['AGEP', 'FES']);
+
+/*
+'FPARC', 'GRPIP', 'NOP', 'POVPIP', 'SPORDER', 'R60', 'RACAIAN', 'RACASN', 'RACBLK', 'RACWHT', 'RNTP', 'WKHP', 'COW', 'DDRS', 'DREM', 'ENG', 'ESP', 'ESR', 'MAR', 'NOC', 'NP', 'NPF', 'OC', 'PAOC', 'RNTM', 'SEX', 'SFR', 'PARTNER', 'FS', 'HICOV', 'MRGP', 'SCH', 'SCHG', 'SCHL', 'SMOCP', 'SMP', 'FOD1P', 'FOD2P', 'VALP', 'RACNH', 'RAC1P', 'RAC2P', 'ACCESS', 'BROADBND', 'LAPTOP', 'RWATPR', 'SATELLITE', 'HISPEED', 'SMARTPHONE', 'TABLET', 'GRNTP', 'TEL', 'ELEP', 'FINCP', 'FULP', 'GASP', 'HINCP', 'OIP', 'PAP', 'PERNP', 'PINCP', 'RETP', 'SEMP', 'SOCP', 'SSIP', 'SSP', 'WAGP', 'YOEP', 'ADJINC', 'INTP', 'HHT2'
+*/
+
