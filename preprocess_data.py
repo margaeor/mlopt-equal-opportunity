@@ -7,6 +7,7 @@ preprocessed_path = os.path.join(OUTPUT_PATH, 'preprocessed.csv')
 
 
 age_range = (25, 55)
+predictor_column = 'income_total'
 
 def mapFunc(x, mapFrom, mapTo):
     try:
@@ -25,6 +26,9 @@ if __name__ == '__main__':
 
     # Filter data by age
     df = df.loc[(df.age >= age_range[0]) & (df.age <= age_range[1]), :]
+
+    # Filter out people without income
+    df = df.loc[df.income_total != 0, :]
 
     # MAPPINGS
     # Import mappings of columns
