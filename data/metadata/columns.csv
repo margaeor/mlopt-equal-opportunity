@@ -57,7 +57,6 @@ RACAIAN,race_aian,American Indian and Alaska Native recode (American Indian and 
 RACASN,race_asian,Asian recode (Asian alone or in combination with one or more other races),2,Edited Items,,1
 RACBLK,race_black,Black or African American recode (Black alone or in combination with one or more other races),2,Edited Items,,1
 RAC1P,race_detailed_1,Recoded detailed race code,9,Recodes,,1
-RAC2P,race_detailed_2,Recoded detailed race code,68,Recodes,,1
 RACNH,race_nh,Native Hawaiian recode (Native Hawaiian alone or in combination with one or more other races),2,Recodes,,1
 RACWHT,race_white,White recode (White alone or in combination with one or more other races),2,Edited Items,,1
 RNTP,rent_monthly,Monthly rent (use ADJHSG to adjust RNTP to constant dollars),2,Estimate,,0
@@ -72,4 +71,3 @@ TEL,telephone_service,Telephone service,4,Estimate,,1
 PARTNER,unmarried_partner_household,Unmarried partner household,6,Recodes,,1
 COW,worker_class,Class of worker,10,Estimate,,1
 WKHP,workhours_week,Usual hours worked per week past 12 months,3,Estimate,,0
-YOEP,year_of_entry,Year of entry,82,Estimate,,0
