@@ -15,8 +15,18 @@ def mapFunc(x, mapFrom, mapTo):
     except:
         return x
 
-    
-    
+
+def discard_unmapped_values(df_map, df, variable_aliases):
+    mapped_cols = set(df_map.columns.to_list()).intersection(variable_aliases)
+    print(mapped_cols)
+    print(f"Number of rows before map removal {df.shape[0]}")
+    for col in mapped_cols:
+        legal_values = set(df_map[col].to_list())
+        df = df.loc[(df[col].isna()) | (df[col].isin(legal_values)), :]
+
+    print(f"Number of rows after map removal {df.shape[0]}")
+
+    return df
 if __name__ == '__main__':
 
 
@@ -38,10 +48,11 @@ if __name__ == '__main__':
     variable_aliases = list(col_mapper['VariableRename'])
     variables_map = [x + '_map' for x in variables]
     variable_aliases_map = [x + '_map' for x in variable_aliases]
-    mappings = pd.read_csv(os.path.join(METADATA_PATH,'mapping.csv'))
+    mappings = pd.read_csv(os.path.join(METADATA_PATH, 'mapping.csv'))
     mappings = mappings.rename(columns={k: v for k, v in zip(variables, variable_aliases)})
     mappings = mappings.rename(columns={k: v for k, v in zip(variables_map, variable_aliases_map)})
 
+    df = discard_unmapped_values(mappings, df, variable_aliases)
 
     output_mapped = pd.DataFrame()
         
