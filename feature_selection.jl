@@ -61,7 +61,7 @@ end
 
 # LOAD X
 seed = 1;
-filepath = "data\\output\\preprocessed.csv"
+filepath = "data\\output\\test_preprocessed.csv"
 df     = DataFrame(CSV.File(filepath; header=1,  pool=true))
 
 # LOAD Y

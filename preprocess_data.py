@@ -2,6 +2,8 @@ import os
 import pandas as pd
 from constants import *
 
+import numpy as np
+
 input_file = OUTPUT_FILE
 preprocessed_path = os.path.join(OUTPUT_PATH, 'preprocessed.csv')
 
@@ -79,9 +81,26 @@ if __name__ == '__main__':
     print("Performing one-hot encoding on categorical columns")
     df = pd.get_dummies(df, columns=categorical_cols, dummy_na=True)
 
+    # 
+    df["num_degrees"] = np.zeros(df.shape[0])
+    for i in range(1,64):
+        if any(("field_of_degree_1_"+str(i)+".0") in s for s in df.columns):
+            df["field_of_degree_"+str(i)] = np.minimum(df["field_of_degree_1_"+str(i)+".0"] + df["field_of_degree_2_"+str(i)+".0"], 1)
+            df["num_degrees"] = df["num_degrees"] + df["field_of_degree_1_"+str(i)+".0"] + df["field_of_degree_2_"+str(i)+".0"]
+            df.drop("field_of_degree_1_"+str(i)+".0", axis=1, inplace= True)
+            df.drop("field_of_degree_2_"+str(i)+".0", axis=1, inplace= True)
+            # df["field_of_degree_"+str(i)] = np.minimum(df["field_of_degree_1_"+str(i)+".0"] + df["field_of_degree_2_"+str(i)+".0"], 1)
+            # df["num_degrees"] = df["num_degrees"] + df["field_of_degree_1_"+str(i)+".0"] + df["field_of_degree_2_"+str(i)+".0"]
+            # df.drop(columns=["field_of_degree_1_"+str(i)+".0", "field_of_degree_2_"+str(i)+".0"])
+
+    df = pd.get_dummies(df, columns=["num_degrees"], dummy_na=True)
+
     # Replace missing values with 0 in non-categorical columns (mostly related to income)
     print("Replacing missing values of non categorical columns")
     df[non_categorical_cols] = df[non_categorical_cols].fillna(value=0)
+
+
+
 
     print(f"Dataframe size after one-hot {df.shape}")
     df.to_csv(preprocessed_path, index=False, chunksize=100000)
