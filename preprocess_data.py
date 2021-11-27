@@ -83,7 +83,7 @@ if __name__ == '__main__':
 
     # 
     df["num_degrees"] = np.zeros(df.shape[0])
-    for i in range(1,64):
+    for i in range(1,65):
         if any(("field_of_degree_1_"+str(i)+".0") in s for s in df.columns):
             df["field_of_degree_"+str(i)] = np.minimum(df["field_of_degree_1_"+str(i)+".0"] + df["field_of_degree_2_"+str(i)+".0"], 1)
             df["num_degrees"] = df["num_degrees"] + df["field_of_degree_1_"+str(i)+".0"] + df["field_of_degree_2_"+str(i)+".0"]
@@ -92,6 +92,16 @@ if __name__ == '__main__':
             # df["field_of_degree_"+str(i)] = np.minimum(df["field_of_degree_1_"+str(i)+".0"] + df["field_of_degree_2_"+str(i)+".0"], 1)
             # df["num_degrees"] = df["num_degrees"] + df["field_of_degree_1_"+str(i)+".0"] + df["field_of_degree_2_"+str(i)+".0"]
             # df.drop(columns=["field_of_degree_1_"+str(i)+".0", "field_of_degree_2_"+str(i)+".0"])
+
+    # df["field_of_degree_"+str(i)] = np.minimum(df["field_of_degree_1_"+str(i)+".0"] + df["field_of_degree_2_"+str(i)+".0"], 1)
+    # df["num_degrees"] = df["num_degrees"] + df["field_of_degree_1_"+str(i)+".0"] + df["field_of_degree_2_"+str(i)+".0"]
+    # df.drop("field_of_degree_1_"+str(i)+".0", axis=1, inplace= True)
+    # df.drop("field_of_degree_2_"+str(i)+".0", axis=1, inplace= True)
+    # # df["field_of_degree_"+str(i)] = np.minimum(df["field_of_degree_1_"+str(i)+".0"] + df["field_of_degree_2_"+str(i)+".0"], 1)
+    # # df["num_degrees"] = df["num_degrees"] + df["field_of_degree_1_"+str(i)+".0"] + df["field_of_degree_2_"+str(i)+".0"]
+    # # df.drop(columns=["field_of_degree_1_"+str(i)+".0", "field_of_degree_2_"+str(i)+".0"])
+
+
 
     df = pd.get_dummies(df, columns=["num_degrees"], dummy_na=True)
 
