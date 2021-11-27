@@ -17,15 +17,21 @@ normalization_type = "std"
 
 function calc_r2(X, y, beta)
     X = augment_X(X)
-    SSres = sum( (y .- X*beta).^2 )
+    SSres = sum( (y .- X*beta .- beta0).^2 )
     SStot = sum( (y .- Statistics.mean(y)).^2 )
     return 1-SSres/SStot
 end
 
 function calc_mse(X, y, beta)
+    X = augment_X(X)
     n,p = size(X)
     return sum((X*beta .- y).^2)/n
 end
+
+# function compute_mse(X, y, beta, beta0)
+#     n,p = size(X)
+#     return sum((beta0 .+ X*beta .- y).^2)/n
+# end
 
 function grid_search(X, y, solver_func, error_func, error_strategy="Min",train_val_ratio=0.7;params... )
 
@@ -98,7 +104,7 @@ function partitionTrainTest(X,y, at = 0.7, s=seed)
 end
 
 function augment_X(X)
-    return [X ones(size(X,1),1)]
+    return [ones(size(X,1),1) X]
 end
 
 function solve_holistic_regr(X,y;gamma,rho,k)
@@ -214,7 +220,7 @@ end
 
 df = DataFrame(CSV.File(df_path, header=1))
 # df = last(df, 1000)
-df = df[shuffle(1:nrow(df))[1:10000], :]
+df = df[shuffle(1:nrow(df))[1:100000], :]
 
 names(df)
 
@@ -243,9 +249,9 @@ X, y = Matrix{Float32}(df[!, filter(x -> x != predictor_col, cols)]), df[!,predi
 
 X_train, y_train, X_test, y_test = partitionTrainTest(X, y, 0.7);
 X_train = normalize_data(X_train, normalization_type; is_train=true);
-y_train = normalize_data(y_train; is_train=true);
+# y_train = normalize_data(y_train; is_train=true);
 X_test = normalize_data(X_test, normalization_type; is_train=false);
-y_test = normalize_data(y_test; is_train=false);
+# y_test = normalize_data(y_test; is_train=false);
 
 
 k = 50
@@ -274,4 +280,33 @@ for i in sortperm(abs.(betas[2:end]), rev=true)
 end
 
 
-X_test
+
+function iai2betas(learner, p)
+    beta0 = IAI.get_prediction_constant(learner)
+    betas = IAI.get_prediction_weights(learner)[1]
+    
+    features = string.(collect(keys(betas)))
+
+    beta_coeffs = zeros(p)
+    for i = 1:p
+        if "x$i" in features
+            beta_coeffs[i] = betas[Symbol("x$i")]
+        end
+    end
+            
+    return [beta0 ; beta_coeffs]
+end
+
+
+@time begin
+    
+    m = IAI.OptimalFeatureSelectionRegressor(
+        sparsity=50
+    )
+
+    res = IAI.fit!(m, X_train, y_train)
+
+end
+
+
+betas_iai = iai2betas(m, size(X,2))
