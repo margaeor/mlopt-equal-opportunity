@@ -2,6 +2,9 @@ using JuMP, Gurobi, Random, Statistics, Combinatorics, LinearAlgebra
 using DataFrames, CSV, IterTools
 using Random
 using GLMNet, StatsBase
+using TimerOutputs
+
+const sparseTo = TimerOutput()
 
 seed = 2
 gurobi_env = Gurobi.Env()
@@ -17,6 +20,11 @@ function calc_r2(X, y, beta)
     SSres = sum( (y .- X*beta).^2 )
     SStot = sum( (y .- Statistics.mean(y)).^2 )
     return 1-SSres/SStot
+end
+
+function calc_mse(X, y, beta)
+    n,p = size(X)
+    return sum((X*beta .- y).^2)/n
 end
 
 function grid_search(X, y, solver_func, error_func, error_strategy="Min",train_val_ratio=0.7;params... )
@@ -111,13 +119,13 @@ function solve_holistic_regr(X,y;gamma,rho,k)
     @constraint(m, [i=1:p], -M*z[i]<=beta[i])
     @constraint(m, sum(z)<=k)
     #@constraint(m, [i=1:4:p-3], sum(z[i+j] for j=0:3)<=1)
-#     for i in 1:p
-#         for j in i+1:p
-#             if abs(C[i,j]) > rho
-#                 @constraint(m, z[i]+z[j] <= 1)
-#             end
-#         end
-#     end
+    #     for i in 1:p
+    #         for j in i+1:p
+    #             if abs(C[i,j]) > rho
+    #                 @constraint(m, z[i]+z[j] <= 1)
+    #             end
+    #         end
+    #     end
     optimize!(m)
     return JuMP.value.(beta)
 end
@@ -141,65 +149,73 @@ function solve_inner_problem(X,Y,s,γ)
   return obj, grad
 end
 
-function sparse_regression(X,Y,k,γ,s0=[])
-    
-    m = Model(Gurobi.Optimizer)
-    set_optimizer_attribute(m, "OutputFlag", 0)
-    n,p = size(X)
-    
-    ###
-    # Step 1: Define the Variables:
-    ###
-    @variable(m, s[1:p], Bin)
-    @variable(m, t >= 0)
-    
-    ###
-    # Step 2: Set Up Constraints and Objective
-    ###
-    @constraint(m, sum(s) <= k)
-    # Initial solution: if none is provided, start at arbitrary point
-    if length(s0) == 0
-        s0 = zeros(p)
-        s0[1:k] .= 1
-    end
-    obj0, grad0 = solve_inner_problem(X,Y, s0, γ)
-    @constraint(m, t >= obj0 + dot(grad0, s - s0))
-    # Objective
-    @objective(m, Min, t)
-    
-    ###
-    # Step 3: Define the outer approximation function
-    ###
-    function outer_approximation(cb_data)
-        s_val = []
-        for i = 1:p
-            s_val = [s_val;callback_value(cb_data, s[i])]
-        end
-        obj, grad = solve_inner_problem(X,Y, s_val, γ)
-        # add the cut: t >= obj + sum(∇s * (s - s_val))
-        offset = sum(grad .* s_val)
-        con = @build_constraint(t >= obj + sum(grad[j] * s[j] for j=1:p) - offset)    
-        MOI.submit(m, MOI.LazyConstraint(cb_data), con)
-    end
-    MOI.set(m, MOI.LazyConstraintCallback(), outer_approximation)
+function sparse_regression(X,Y,k,γ,s0=[]; outFlag = 1)
+    @timeit sparseTo "Sparse Regression" begin
 
-    ###
-    # Step 4: Solve
-    ###
-    optimize!(m)
-    s_opt = JuMP.value.(s)
-    s_nonzeros = findall(x -> x>0.5, s_opt)
-    β = zeros(p)
-    X_s = X[:, s_nonzeros]
-    # Formula for the nonzero coefficients
-    β[s_nonzeros] = γ * X_s' * (Y - X_s * ((I / γ + X_s' * X_s) \ (X_s'* Y)))
-    
+        m = Model(Gurobi.Optimizer)
+        set_optimizer_attribute(m, "OutputFlag", outFlag)
+        set_optimizer_attribute(m, "TimeLimit", 60)
+        n,p = size(X)
+        
+        ###
+        # Step 1: Define the Variables:
+        ###
+        @variable(m, s[1:p], Bin)
+        @variable(m, t >= 0)
+        
+        ###
+        # Step 2: Set Up Constraints and Objective
+        ###
+        @constraint(m, sum(s) <= k)
+        # Initial solution: if none is provided, start at arbitrary point
+        if length(s0) == 0
+            s0 = zeros(p)
+            s0[1:k] .= 1
+        end
+        obj0, grad0 = solve_inner_problem(X,Y, s0, γ)
+        @constraint(m, t >= obj0 + dot(grad0, s - s0))
+        # Objective
+        @objective(m, Min, t)
+        
+        ###
+        # Step 3: Define the outer approximation function
+        ###
+        function outer_approximation(cb_data)
+            @timeit sparseTo "Sparse Outter Approximation" begin
+
+                s_val = []
+                for i = 1:p
+                    s_val = [s_val;callback_value(cb_data, s[i])]
+                end
+                @timeit sparseTo "Sparse Inner Problem" obj, grad = solve_inner_problem(X,Y, s_val, γ)
+                # add the cut: t >= obj + sum(∇s * (s - s_val))
+                offset = sum(grad .* s_val)
+                con = @build_constraint(t >= obj + sum(grad[j] * s[j] for j=1:p) - offset)    
+                MOI.submit(m, MOI.LazyConstraint(cb_data), con)
+            end
+        end
+
+        MOI.set(m, MOI.LazyConstraintCallback(), outer_approximation)
+
+        ###
+        # Step 4: Solve
+        ###
+        optimize!(m)
+        s_opt = JuMP.value.(s)
+        s_nonzeros = findall(x -> x>0.5, s_opt)
+        β = zeros(p)
+        X_s = X[:, s_nonzeros]
+        # Formula for the nonzero coefficients
+        β[s_nonzeros] = γ * X_s' * (Y - X_s * ((I / γ + X_s' * X_s) \ (X_s'* Y)))
+    end
     return Dict("support" => s_opt, "coefs" => β, "selected_features" => s_nonzeros)
     
 end
 
 df = DataFrame(CSV.File(df_path, header=1))
-df = last(df, 1000)
+# df = last(df, 1000)
+df = df[shuffle(1:nrow(df))[1:10000], :]
+
 names(df)
 
 excluded_cols = [
@@ -227,14 +243,24 @@ X, y = Matrix{Float32}(df[!, filter(x -> x != predictor_col, cols)]), df[!,predi
 
 X_train, y_train, X_test, y_test = partitionTrainTest(X, y, 0.7);
 X_train = normalize_data(X_train, normalization_type; is_train=true);
+y_train = normalize_data(y_train; is_train=true);
 X_test = normalize_data(X_test, normalization_type; is_train=false);
+y_test = normalize_data(y_test; is_train=false);
+
 
 k = 50
 #betas, params = grid_search(X_train, y_train, solve_holistic_regr, calc_r2, "Max", 0.7; gamma=[0.1], rho=[0.7], k=[20])
 #betas = fit_lasso(X_train, y_train)
+reset_timer!(sparseTo)
 betas = sparse_regression(X_train, y_train, k ,1/sqrt(size(X_train,1)))
-r2_c = calc_r2(X_test, y_test, betas)
+sparseTo
 
+r2_c = calc_r2(X_test, y_test, betas["coefs"])
+
+mse_c = calc_mse(X_test, y_test, betas["coefs"])
+mse_c = calc_mse(X_train, y_train, betas["coefs"])
+
+reset_timer!(sparseTo)
 
 #cols = filter(x -> x ∉ excluded_cols, names(df))
 #important_features = cols[findall(abs.(betas_hol) .>= 0.01)]
