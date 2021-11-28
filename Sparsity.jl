@@ -17,7 +17,7 @@ normalization_type = "std"
 
 function calc_r2(X, y, beta)
     X = augment_X(X)
-    SSres = sum( (y .- X*beta .- beta0).^2 )
+    SSres = sum( (y .- X*beta).^2 )
     SStot = sum( (y .- Statistics.mean(y)).^2 )
     return 1-SSres/SStot
 end
@@ -237,7 +237,7 @@ end
 
 df = DataFrame(CSV.File(df_path, header=1))
 # df = last(df, 1000)
-df = df[shuffle(1:nrow(df))[1:100000], :]
+df = df[shuffle(1:nrow(df))[1:300000], :]
 
 names(df)
 
@@ -295,13 +295,11 @@ reset_timer!(sparseTo)
 THRESHOLD = 0.000001
 println("Most important features:")
 for i in sortperm(abs.(betas[2:end]), rev=true)
-    if abs(betas[i])<=THRESHOLD
+    if abs(betas[i+1])<=THRESHOLD
         continue
     end
     println("- $(cols[i]) : $(betas[i+1])")
 end
-
-
 
 function iai2betas(learner, p)
     beta0 = IAI.get_prediction_constant(learner)
@@ -319,16 +317,32 @@ function iai2betas(learner, p)
     return [beta0 ; beta_coeffs]
 end
 
-
-@time begin
-    
+@time begin    
     m = IAI.OptimalFeatureSelectionRegressor(
         sparsity=50
     )
-
     res = IAI.fit!(m, X_train, y_train)
-
 end
 
-
 betas_iai = iai2betas(m, size(X,2))
+
+IAI.score(m, X_train, y_train)
+IAI.score(m, X_test, y_test)
+
+r2_c = calc_r2(X_test, y_test, betas_iai)
+mse_c = calc_mse(X_test, y_test, betas_iai)
+
+println("r^2 train $(calc_r2(X_train, y_train, betas_iai))")
+println("r^2 test $(calc_r2(X_test, y_test, betas_iai))")
+println("mse train $(calc_mse(X_train, y_train, betas_iai))")
+println("mse test $(calc_mse(X_test, y_test, betas_iai))")
+
+
+THRESHOLD = 0.000001
+for i in sortperm(abs.(betas_iai[2:end]), rev=true)
+    if abs(betas_iai[i+1])<=THRESHOLD
+        continue
+    end
+    println("- $(cols[i]) : $(betas_iai[i+1])")
+end
+
