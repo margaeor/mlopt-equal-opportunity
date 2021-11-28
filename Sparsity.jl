@@ -49,12 +49,19 @@ function grid_search(X, y, solver_func, error_func, error_strategy="Min",train_v
     error_multiplier = error_strategy == "Min" ? 1 : -1
     best_error = Inf # We consider minimization
     best_param_set = []
+    println("----------------------------------------")
     
+    println(param_combinations)
+    println("----------------------------------------")
+
+    println(param_combinations)
     # Iterate over all combinations of parameters
     for param_comb in param_combinations
+        println("**********************")
+        println(param_comb)
         
         # Optimize model and find optimal variables
-        model_vars = solver_func(X_train,y_train;param_comb...)
+        global model_vars = solver_func(X_train,y_train;param_comb...)
         
         # Evaluate model error on validation set
         if model_vars isa Tuple
@@ -73,11 +80,43 @@ function grid_search(X, y, solver_func, error_func, error_strategy="Min",train_v
     
     # Retrain the model on the whole training set 
     # using the best set of params
-    model_vars = solver_func(X,y;best_param_set...)
+    # model_vars = solver_func(X,y;best_param_set...)
     
     # Return the model variable and the best params
     return model_vars, best_param_set
 end
+
+function solve_holistic_regr(X,y;gamma,rho,k, outFlag = 1)
+    C = cor(X)
+    n,p = size(X)
+    X_aug = augment_X(X)
+    M = 10^5
+    # m = Model(with_optimizer(Gurobi.Optimizer, gurobi_env))
+    m = Model(with_optimizer(Gurobi.Optimizer))
+    set_optimizer_attribute(m, "OutputFlag", outFlag)
+    set_optimizer_attribute(m, "PSDTol", 10)
+    set_optimizer_attribute(m, "TimeLimit", 300)
+    @variable(m, beta[1:(p+1)])
+    @variable(m, z[1:p],Bin)
+    @variable(m, t[1:p])
+    @objective(m, Min, 1/2*sum((X_aug*beta.-y).^2)+gamma*sum(t[i] for i=1:p))
+    @constraint(m, [i=1:p], t[i]>= beta[i])
+    @constraint(m, [i=1:p], t[i]>= -beta[i])
+    @constraint(m, [i=1:p], beta[i]<= M*z[i])
+    @constraint(m, [i=1:p], -M*z[i]<=beta[i])
+    @constraint(m, sum(z)<=k)
+    #@constraint(m, [i=1:4:p-3], sum(z[i+j] for j=0:3)<=1)
+    #     for i in 1:p
+    #         for j in i+1:p
+    #             if abs(C[i,j]) > rho
+    #                 @constraint(m, z[i]+z[j] <= 1)
+    #             end
+    #         end
+    #     end
+    optimize!(m)
+    return JuMP.value.(beta)
+end
+
 
 function normalize_data(X, method="minmax"; is_train=true)
     X = copy(X)
@@ -107,34 +146,6 @@ function augment_X(X)
     return [ones(size(X,1),1) X]
 end
 
-function solve_holistic_regr(X,y;gamma,rho,k)
-    C = cor(X)
-    n,p = size(X)
-    X_aug = augment_X(X)
-    M = 10^5
-    m = Model(with_optimizer(Gurobi.Optimizer, gurobi_env))
-    set_optimizer_attribute(m, "OutputFlag", 0)
-    set_optimizer_attribute(m, "PSDTol", 1)
-    @variable(m, beta[1:(p+1)])
-    @variable(m, z[1:p],Bin)
-    @variable(m, t[1:p])
-    @objective(m, Min, 1/2*sum((X_aug*beta.-y).^2)+gamma*sum(t[i] for i=1:p))
-    @constraint(m, [i=1:p], t[i]>= beta[i])
-    @constraint(m, [i=1:p], t[i]>= -beta[i])
-    @constraint(m, [i=1:p], beta[i]<= M*z[i])
-    @constraint(m, [i=1:p], -M*z[i]<=beta[i])
-    @constraint(m, sum(z)<=k)
-    #@constraint(m, [i=1:4:p-3], sum(z[i+j] for j=0:3)<=1)
-    #     for i in 1:p
-    #         for j in i+1:p
-    #             if abs(C[i,j]) > rho
-    #                 @constraint(m, z[i]+z[j] <= 1)
-    #             end
-    #         end
-    #     end
-    optimize!(m)
-    return JuMP.value.(beta)
-end
 
 function fit_lasso(X, y)
     cv = glmnetcv(X, y);
@@ -237,7 +248,7 @@ end
 
 df = DataFrame(CSV.File(df_path, header=1))
 # df = last(df, 1000)
-df = df[shuffle(1:nrow(df))[1:300000], :]
+df = df[shuffle(1:nrow(df))[1:100000], :]
 
 names(df)
 
@@ -259,7 +270,12 @@ excluded_cols = [
     "gross_rent",
     "person_number",
     "rent_monthly",
-    "property_value"
+    "property_value",
+    "mortgage_first_payment",
+    "gross_rent_pcnt_income",
+    "electricity_cost",
+    "cost_gas",
+    "cost_fuel"
 ]
 cols = filter(x -> x ∉ excluded_cols, names(df))
 X, y = Matrix{Float32}(df[!, filter(x -> x != predictor_col, cols)]), df[!,predictor_col]
@@ -346,3 +362,8 @@ for i in sortperm(abs.(betas_iai[2:end]), rev=true)
     println("- $(cols[i]) : $(betas_iai[i+1])")
 end
 
+
+betas_holistic, params_holistic = grid_search(X_train, y_train, solve_holistic_regr, calc_r2, "Max", 0.7; gamma=[0.1], rho=[0.7], k=[20])
+
+model_vars = solve_holistic_regr(X_train,y_train;param_comb...)
+        
