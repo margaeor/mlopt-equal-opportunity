@@ -115,7 +115,10 @@ if __name__ == '__main__':
     )
     grid.fit(X_train, y_train)
 
+    # grid.show_in_browser()
     grid.get_learner()
-    #elbow_plot(X_train)
+
+    lnr = grid.get_learner()
+
 
 
