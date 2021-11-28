@@ -155,20 +155,27 @@ function solve_inner_problem(X,Y,s,γ)
   return obj, grad
 end
 
-function sparse_regression(X,Y,k,γ,s0=[]; outFlag = 1)
+function sparse_regression(X,Y,k,γ,s0=[],is_binary=false; outFlag = 1)
     @timeit sparseTo "Sparse Regression" begin
-
         m = Model(Gurobi.Optimizer)
         set_optimizer_attribute(m, "OutputFlag", outFlag)
-        set_optimizer_attribute(m, "TimeLimit", 60)
+        set_optimizer_attribute(m, "TimeLimit", 45)
         n,p = size(X)
         
         ###
         # Step 1: Define the Variables:
         ###
-        @variable(m, s[1:p], Bin)
-        @variable(m, t >= 0)
         
+        if is_binary
+            @variable(m, s[1:p], Bin)
+            #@constraint(m, s[1:p] >= 0)
+        else
+            @variable(m, s[1:p]>=0)
+            @constraint(m, [i=1:p], s[i] <= 1)
+        end
+        
+        @variable(m, t >= 0)
+
         ###
         # Step 2: Set Up Constraints and Objective
         ###
@@ -188,7 +195,6 @@ function sparse_regression(X,Y,k,γ,s0=[]; outFlag = 1)
         ###
         function outer_approximation(cb_data)
             @timeit sparseTo "Sparse Outter Approximation" begin
-
                 s_val = []
                 for i = 1:p
                     s_val = [s_val;callback_value(cb_data, s[i])]
@@ -200,7 +206,6 @@ function sparse_regression(X,Y,k,γ,s0=[]; outFlag = 1)
                 MOI.submit(m, MOI.LazyConstraint(cb_data), con)
             end
         end
-
         MOI.set(m, MOI.LazyConstraintCallback(), outer_approximation)
 
         ###
@@ -208,14 +213,26 @@ function sparse_regression(X,Y,k,γ,s0=[]; outFlag = 1)
         ###
         optimize!(m)
         s_opt = JuMP.value.(s)
-        s_nonzeros = findall(x -> x>0.5, s_opt)
+        
+        s_nonzeros = []
+        # println(s_opt)
+        # println("t: $(JuMP.value(t))")
+        if !is_binary
+            idxes = sortperm(s_opt, rev=true)
+            s = zeros(p)
+            s[idxes[1:k]] = ones(k)
+            s_nonzeros = idxes
+        else
+            s_nonzeros = findall(x -> x>0.5, s_opt)
+        end
         β = zeros(p)
         X_s = X[:, s_nonzeros]
         # Formula for the nonzero coefficients
         β[s_nonzeros] = γ * X_s' * (Y - X_s * ((I / γ + X_s' * X_s) \ (X_s'* Y)))
+        
+        #return Dict("support" => s_opt, "coefs" => β, "selected_features" => s_nonzeros)
+        return is_binary ? [0;β] : β 
     end
-    return Dict("support" => s_opt, "coefs" => β, "selected_features" => s_nonzeros)
-    
 end
 
 df = DataFrame(CSV.File(df_path, header=1))
@@ -258,13 +275,18 @@ k = 50
 #betas, params = grid_search(X_train, y_train, solve_holistic_regr, calc_r2, "Max", 0.7; gamma=[0.1], rho=[0.7], k=[20])
 #betas = fit_lasso(X_train, y_train)
 reset_timer!(sparseTo)
-betas = sparse_regression(X_train, y_train, k ,1/sqrt(size(X_train,1)))
+betas_lasso = fit_lasso(X_train, y_train)
+betas = sparse_regression(X_train, y_train, k ,1/sqrt(size(X_train,1)), 1.0*(betas_lasso[2:end] .>= 0.5), true)
 sparseTo
 
-r2_c = calc_r2(X_test, y_test, betas["coefs"])
 
-mse_c = calc_mse(X_test, y_test, betas["coefs"])
-mse_c = calc_mse(X_train, y_train, betas["coefs"])
+r2_c = calc_r2(X_test, y_test, betas)
+mse_c = calc_mse(X_test, y_test, betas)
+
+println("r^2 train $(calc_r2(X_train, y_train, betas))")
+println("r^2 test $(calc_r2(X_test, y_test, betas))")
+println("mse train $(calc_mse(X_train, y_train, betas))")
+println("mse test $(calc_mse(X_test, y_test, betas))")
 
 reset_timer!(sparseTo)
 
