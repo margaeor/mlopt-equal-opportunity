@@ -60,6 +60,67 @@ def elbow_plot(X_train, mn=2, mx=10):
     plt.show()
 
 
+
+def train_knn(df_X, outcome_col, k=5):
+
+    X_train = df_X.loc[:, [col for col in df_X.columns if col != outcome_col]].to_numpy()
+    X_train = X_train.astype(np.float32)
+    index = faiss.IndexFlatL2(X_train.shape[1])
+
+    index.add(X_train)
+
+    return index
+
+
+class KNNPredictor:
+    def __init__(self, k=5):
+        self.index = None
+        self.y = None
+        self.k = k
+        self.scaler = preprocessing.StandardScaler()
+
+    def get_X_from_df(self, df):
+        X = df.loc[:, [col for col in df.columns if col != self.outcome_col]].to_numpy()
+        return X
+
+    def get_y_from_df(self, df):
+        y = df.loc[:, self.outcome_col].to_numpy()
+        return y
+
+    def fit(self, df, outcome_col):
+
+        self.outcome_col = outcome_col
+
+        X, y = self.get_X_from_df(df), self.get_y_from_df(df)
+
+        self.scaler.fit(X)
+        X = self.scaler.transform(X)
+
+        self.outcome_col = outcome_col
+        self.index = faiss.IndexFlatL2(X.shape[1])
+        self.index.add(np.ascontiguousarray(X).astype(np.float32))
+        self.y = y
+
+    def predict(self, df):
+
+        X = self.get_X_from_df(df)
+        distances, indices = self.index.search(np.ascontiguousarray(X).astype(np.float32), k=self.k)
+        y_neighs = self.y[indices]
+        #predictions = np.mean(y_neighs, axis=1)
+
+        return y_neighs, indices
+
+# def CustomClustering:
+#
+#     def __init__(self):
+#
+#         self.X = None
+#         self.y = None
+#
+#     def fit(self, df):
+
+
+
 preprocessed_path = os.path.join(OUTPUT_PATH, 'test_preprocessed.csv')
 
 if __name__ == '__main__':
@@ -97,8 +158,6 @@ if __name__ == '__main__':
     X_train = np.ascontiguousarray(scaler.transform(X_train), dtype=np.float32)
     X_test = np.ascontiguousarray(scaler.transform(X_test), dtype=np.float32)
 
-
-
     k = 5
 
     _, clusters, kmeans = perform_kmeans(X_train, k)
@@ -113,12 +172,23 @@ if __name__ == '__main__':
         #cp=0.001
         localsearch=False
     )
-    grid.fit(X_train, y_train)
+    grid.fit(df_train.loc[:, final_cols], y_train)
+    #grid.show_in_browser()
+    #grid.get_learner()
 
-    # grid.show_in_browser()
-    grid.get_learner()
+    #lnr = grid.get_learner()
 
-    lnr = grid.get_learner()
+
+    income_col = 'income_total'
+    cols_for_prediction = final_cols
+
+    pred = KNNPredictor(k=5)
+    pred.fit(df, income_col)
+    y_neighs, _ = pred.predict(df_test.head(100))
+
+
+
+
 
 
 
