@@ -18,6 +18,10 @@ import pathlib
 from gurobipy import Model, GRB
 import random
 from tqdm import tqdm
+from sklearn.metrics import r2_score
+from sklearn import linear_model
+
+#coefficient_of_dermination = r2_score(y, p(x))
 
 np.random.seed(100)
 random.seed(42)
@@ -62,6 +66,21 @@ def perform_kmeans(X, k, sk=True):
 
     return distortion, clusters, kmeans
 
+def find_col_names_from_dummy_cols(df, clust_cols):
+
+    col_name_map = {}
+
+    for col in df.columns:
+
+        match = re.match(r"^(.*)_([0-9.]+|nan)$", col)
+        mapping = match.group(1) if match else col
+
+        if mapping in clust_cols:
+            col_name_map[col] = mapping
+
+
+    return col_name_map
+
 def elbow_plot(X_train, mn=2, mx=10):
 
     distortions = []
@@ -95,20 +114,23 @@ def train_knn(df_X, outcome_col, k=5):
 
 
 class KNNPredictor:
-    def __init__(self, outcome_col, excluded_cols, k=5 ):
+    def __init__(self, outcome_col, k=5 ):
         self.index = None
         self.y = None
         self.k = k
         self.scaler = preprocessing.StandardScaler()
         self.outcome_col = outcome_col
-        self.excluded_cols = excluded_cols
+        #self.excluded_cols = excluded_cols
         self.used_cols = None
         self.xgb = XGBRegressor()
+        #self.xgb = linear_model.Lasso(alpha=0.1)
+        self.train_metrics = None
+        self.test_metrics = None
 
     def get_X_from_df(self, df):
 
         if self.used_cols is None:
-            X = df.loc[:, [col for col in df.columns if col != self.outcome_col and col not in self.excluded_cols]]
+            X = df.loc[:, [col for col in df.columns if col != self.outcome_col]]
             self.used_cols = X.columns.to_list()
         else:
             X = df.loc[:, self.used_cols]
@@ -130,7 +152,9 @@ class KNNPredictor:
         self.index.add(np.ascontiguousarray(X).astype(np.float32))
         self.y = y
 
-    def predict(self, df):
+        self.evaluate(df, is_train=True)
+
+    def predict(self, df, is_train=False):
 
         X = self.get_X_from_df(df)
 
@@ -139,8 +163,17 @@ class KNNPredictor:
         y_neighs = self.y[indices]
         predictions = np.mean(y_neighs, axis=1)
 
-        pred = self.xgb.predict(X)
+        predictions = self.xgb.predict(X)
+
         return indices, predictions
+
+    def evaluate(self, df, is_train=False):
+
+        _, y_pred = self.predict(df)
+
+        s = 'train' if is_train else 'test'
+        print(f"R squared {s} {df.shape[0]}: {r2_score(df[self.outcome_col].to_numpy(), y_pred)}")
+
 
 class CustomClustering:
 
@@ -156,37 +189,26 @@ class CustomClustering:
         self.scaler = None
         self.clusters = None
         self.kmeans = None
-        self.final_cols = None
+        self.final_cluster_cols = None
         self.possible_interventions = [i for i in possible_interventions if not pd.isna(i) and i != 0]
         self.knn_predictors = []
         self.treatment_desc = {k:v for k,v in treatment_desc.items() if k in self.possible_interventions}
         self.z_avg_all = None
 
-    def find_col_names_from_dummy_cols(self, df, clust_cols):
-
-        col_name_map = {}
-
-        for col in df.columns:
-
-            match = re.match(r"^(.*)_([0-9.]+|nan)$", col)
-            mapping = match.group(1) if match else col
-
-            if mapping in clust_cols:
-                col_name_map[col] = mapping
 
 
-        return col_name_map
-
-    def fit(self, df, clust_cols):
+    def fit(self, df, clust_cols, knn_cols):
 
         df = df.copy()
 
         KNN_K = 10
         knn_excluded_cols = ['z', 'z_id', self.outcome_col]
 
-        col_name_map = self.find_col_names_from_dummy_cols(df, clust_cols)
+        clust_col_name_map = find_col_names_from_dummy_cols(df, clust_cols)
+        knn_col_name_map = find_col_names_from_dummy_cols(df, knn_cols)
 
-        self.final_cols = set(col_name_map.keys()) & set(df.columns)
+        self.final_cluster_cols = set(clust_col_name_map.keys()) & set(df.columns)
+        self.final_knn_cols = set(knn_col_name_map.keys()) & set(df.columns)
 
         self.knn_predictors = []
 
@@ -194,13 +216,13 @@ class CustomClustering:
 
             # For every intervention train a KNN predictor to predict the
             # outcome
-            pred = KNNPredictor(outcome_col=self.outcome_col, k=KNN_K, excluded_cols=knn_excluded_cols)
-            pred.fit(df.loc[df.z_id == intervention, self.final_cols|{'income_total'}])
+            pred = KNNPredictor(outcome_col=self.outcome_col, k=KNN_K)
+            pred.fit(df.loc[df.z_id == intervention, self.final_knn_cols | {'income_total'}])
             self.knn_predictors.append(pred)
 
 
 
-        X_train = df.loc[:, self.final_cols].to_numpy()
+        X_train = df.loc[:, self.final_cluster_cols].to_numpy()
 
         self.scaler = preprocessing.StandardScaler()
         self.scaler.fit(X_train)
@@ -256,7 +278,7 @@ class CustomClustering:
 
     def predict(self, df):
 
-        X_test = df.loc[:, self.final_cols].to_numpy()
+        X_test = df.loc[:, self.final_cluster_cols].to_numpy()
         X_test = np.ascontiguousarray(self.scaler.transform(X_test), dtype=np.float32)
 
         return self.kmeans.predict(X_test)
@@ -277,7 +299,7 @@ class CustomClustering:
         )
 
         y = self.predict(df).reshape(-1)
-        grid.fit(df.loc[:, self.final_cols], y)
+        grid.fit(df.loc[:, self.final_cluster_cols], y)
 
         grid.get_learner().write_html('exports/test.html')
 
@@ -338,10 +360,10 @@ class CustomClustering:
             #df['estimated_income'] = df.apply(lambda x: y_knn_all[x.name, x['z_idx']], axis=1)
             df[f'profit_{i}'] = df['estimated_income']-df[self.outcome_col]
             print(f"[ RHO = {rho}")
-            #print(f"min: {df[f'profit_{i}'].min()}")
+            print(f"min: {df[f'profit_{i}'].min()}")
             print(f"mean: {df[f'profit_{i}'].mean()}")
             print(f"std: {df[f'profit_{i}'].std()}")
-            #print(f"max: {df[f'profit_{i}'].max()}")
+            print(f"max: {df[f'profit_{i}'].max()}")
 
     def prescribe_separately(self, df, plot=True):
 
@@ -361,8 +383,9 @@ class CustomClustering:
         # nearest neighbors of y which have treatment z_i
 
         y_knn_all = []
-        for predictor in self.knn_predictors:
+        for z, predictor in zip(self.possible_interventions, self.knn_predictors):
             _, y_pred = predictor.predict(df_og)
+            predictor.evaluate(df_og[df_og.z_id == z], is_train=False)
             y_knn_all.append(y_pred)
 
         y_knn_all = np.array(y_knn_all).T
@@ -412,6 +435,7 @@ class CustomClustering:
         for i in range(len(rho_list)):
             mean_profits.append(df[f'profit_{i}'].mean())
 
+        #rho_list = [rho_list[0]]
         profits = [x for i in range(len(rho_list)) for x in df[f'profit_{i}'].to_list()]
         rhos_tmp = [x for rho in rho_list for x in [rho]*df.shape[0]]
         df_stat = pd.DataFrame({'rhos': rhos_tmp, 'profits': profits})
@@ -441,7 +465,7 @@ class CustomClustering:
         #plt.xticks()
         print(df['z_pred_2'].value_counts())
 
-preprocessed_path = os.path.join(OUTPUT_PATH, 'test_preprocessed.csv')
+preprocessed_path = os.path.join(OUTPUT_PATH, 'preprocessed.csv')
 
 if __name__ == '__main__':
     df = pd.read_csv(preprocessed_path).head(100000)
@@ -458,23 +482,33 @@ if __name__ == '__main__':
     df = df.loc[~df['z_id'].isna(), :]
     df['z_id'] = df['z_id'].astype(int)
 
-    df_train, df_test = train_test_split(df, test_size=0.2, random_state=42, shuffle=True)
+    df_train, df_test = train_test_split(df, test_size=0.2, random_state=4
+                                         , shuffle=True)
 
     df_meta = pd.read_csv(METADATA_FILE)
     df_map = pd.read_csv(FIELD_MAPPING_FILE)
 
     intervention_var_name = df_meta.loc[df_meta.VariableRename == intervention_col_name, 'Variable'].iloc[0]
     clust_cols = set(df_meta.loc[df_meta.UseInClustering2 == 1, 'VariableRename'].to_list())
+    knn_cols = set(df_meta.loc[df_meta.UseInKNN == 1, 'VariableRename'].to_list())
 
     df_interv_descs = df_map[[f'{intervention_var_name}_desc_map',f'{intervention_var_name}_map']]
     interv_desc = {row.iloc[1]: row.iloc[0] for _, row in df_interv_descs.drop_duplicates().iterrows()}
 
     clusterer = CustomClustering(k=3, y_col_name=outcome_col_name, possible_interventions=intervention_vals, treatment_desc=interv_desc)
 
-    clusterer.fit(df_train, clust_cols)
+    clusterer.fit(df_train, clust_cols, knn_cols)
 
-    clusterer.prescribe_separately(df_test)
+    clusterer.prescribe_separately(df_test.head(2000))
 
+
+    exit(0)
+    p = KNNPredictor(outcome_col_name)
+
+    knn_cols_m = list(find_col_names_from_dummy_cols(df_train, knn_cols).keys())
+    #print(knn_cols_m)
+    p.fit(df_train.loc[:, knn_cols_m + [outcome_col_name]])
+    p.evaluate(df_test.loc[:, knn_cols_m + [outcome_col_name]])
     #df_test['cluster'] = clusterer.predict(df_test).tolist()
 
     #print('hi')
