@@ -7,3 +7,5 @@ process_data.py
 .ipynb_checkpoints/*
 __pycache__/*
 test_imputation.py
+chromedriver.exe
+exports/*

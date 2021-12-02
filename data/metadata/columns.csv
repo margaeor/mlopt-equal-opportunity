@@ -1,73 +1,73 @@
-Variable,VariableRename,Description,Number of Values,Type,Values,IsCategorical,UseInClustering
+Variable,VariableRename,Description,Number of Values,Type,Values,IsCategorical,UseInClustering,UseInClustering2
 AGEP,age,Age,2,Estimate,"1 to 99
-00 if under 1 year old",0,1
-DREM,cognitive_difficulty,Cognitive difficulty,3,Edited Items,,1,1
-FULP,cost_fuel,"Fuel cost (yearly cost for fuels other than gas and electricity, use ADJHSG to adjust FULP to constant dollars)",2,Estimate,,0,0
-GASP,cost_gas,"Gas cost (monthly cost, use ADJHSG to adjust GASP to constant dollars)",2,Estimate,,0,0
-PERNP,earnings_total,Total person's earnings (use ADJINC to adjust to constant dollars),5,Estimate,,0,0
-SCHL,educational_attainment,Educational attainment,25,Estimate,,1,1
-ELEP,electricity_cost,"Electricity cost (monthly cost, use ADJHSG to adjust ELEP to constant dollars)",2,Estimate,,0,0
-ESR,employment_status,Employment status recode,7,Recodes,,1,1
-ENG,english_language,Ability to speak English,5,Edited Items,,1,1
-FES,family_employment_status,Family type and employment status,9,Estimate,,1,1
-NPF,family_people_number,Number of persons in family (unweighted),2,Edited Items,,0,1
-FPARC,family_presence_age_children,Family presence and age of related children,5,Recodes,,1,1
-FOD1P,field_of_degree_1,Recoded field of degree - first entry,174,Recodes,,1,1
-FOD2P,field_of_degree_2,Recoded field of degree - second entry,174,Recodes,,1,1
-FS,food_stamps_yearly,Yearly food stamp/Supplemental Nutrition Assistance Program (SNAP) recipiency,3,Estimate,,1,1
-SCHG,grade_level_attending,Grade level attending,17,Estimate,,1,1
-GRNTP,gross_rent,"Gross rent (monthly amount, use ADJHSG to adjust GRNTP to constant dollars)",2,Estimate,,0,0
-GRPIP,gross_rent_pcnt_income,Gross rent as a percentage of household income past 12 months,3,Estimate,,0,0
-HICOV,health_insurance_coverage,Health insurance coverage recode,2,Recodes,,1,1
-R60,household_60_presence,Presence of persons 60 years and over in household (unweighted),4,Edited Items,,1,1
-HHT2,household_family_type,Household/family type (includes cohabiting),13,Estimate,,1,1
-NP,household_people_number,Number of persons in this household,3,Estimate,,0,1
-ADJINC,income_adjustment_factor,Adjustment factor for income and earnings dollar amounts (6 implied decimal places),1,Estimate,,0,0
-OIP,income_all,All other income past 12 months (use ADJINC to adjust to constant dollars),3,Estimate,,0,0
-FINCP,income_family,"Family income (past 12 months, use ADJINC to adjust FINCP to constant dollars)",5,Estimate,,0,0
-HINCP,income_household,"Household income (past 12 months, use ADJINC to adjust HINCP to constant dollars)",5,Estimate,,0,0
-INTP,income_interest_dividends_rental,"Interest, dividends, and net rental income past 12 months (signed, use ADJINC to adjust to constant dollars)",4,Estimate,,0,0
-PAP,income_public_assistance,Public assistance income past 12 months (use ADJINC to adjust to constant dollars),3,Estimate,,0,0
-RETP,income_retirement,Retirement income past 12 months (use ADJINC to adjust to constant dollars),3,Estimate,,0,0
-SEMP,income_self_employment,"Self-employment income past 12 months (signed, use ADJINC to adjust SEMP to constant dollars)",4,Estimate,,0,0
-SSP,income_social_security,Social Security income past 12 months (use ADJINC to adjust SSP to constant dollars),3,Estimate,,0,0
-SSIP,income_supplementary_security,Supplementary Security Income past 12 months (use ADJINC to adjust SSIP to constant dollars),3,Estimate,,0,0
-POVPIP,income_to_poverty_ratio,Income-to-poverty ratio recode,3,Recodes,,0,0
-PINCP,income_total,"Total person's income (signed, use ADJINC to adjust to constant dollars)",5,Estimate,,0,0
-WAGP,income_wages_salary,Wages or salary income past 12 months (use ADJINC to adjust WAGP to constant dollars),3,Estimate,,0,0
-ACCESS,internet,Access to the Internet,4,Estimate,,1,1
-BROADBND,internet_cellular_broadband,Cellular data plan for a smartphone or other mobile device,3,Estimate,,1,1
-HISPEED,internet_highspeed_broadband,"Broadband (high speed) Internet service such as cable, fiber optic, or DSL service",3,Estimate,,1,1
-SATELLITE,internet_satellite,Satellite Internet service,3,Estimate,,1,1
-LAPTOP,laptop,Laptop or desktop,3,Estimate,,1,1
-MAR,marital_status,Marital status,5,Edited Items,,1,1
-RNTM,meals_in_rent,Meals included in rent,3,Estimate,,1,1
-SMOCP,monthly_owner_costs,Selected monthly owner costs (use ADJHSG to adjust SMOCP to constant dollars),3,Estimate,,0,0
-MRGP,mortgage_first_payment,"First mortgage payment (monthly amount, use ADJHSG to adjust MRGP to constant dollars)",2,Estimate,,0,0
-SMP,mortgage_second_payment,"Total payment on all second and junior mortgages and home equity loans (monthly amount, use ADJHSG to adjust SMP to constant dollars)",2,Estimate,,0,0
-SOCP,occupation_code,Standard Occupational Classification (SOC) codes for 2018 and later based on 2018 SOC codes,531,Estimate,,1,1
-OC,own_child,Own child,3,Edited Items,,1,1
-NOC,own_children_number,Number of own children in household (unweighted),3,Estimate,,0,1
-PAOC,own_children_presence,Presence and age of own children,5,Estimate,,1,1
-NOP,parent_nativity,Nativity of parent,9,Recodes,,1,1
-ESP,parents_employment_status,Employment status of parents,9,Edited Items,,1,1
-SPORDER,person_number,Person number,1,Edited Items,,0,0
-VALP,property_value,Property value,2,Estimate,,0,0
-RACAIAN,race_aian,American Indian and Alaska Native recode (American Indian and Alaska Native alone or in combination with one or more other races),2,Edited Items,,1,1
-RACASN,race_asian,Asian recode (Asian alone or in combination with one or more other races),2,Edited Items,,1,1
-RACBLK,race_black,Black or African American recode (Black alone or in combination with one or more other races),2,Edited Items,,1,1
-RAC1P,race_detailed_1,Recoded detailed race code,9,Recodes,,1,1
-RACNH,race_nh,Native Hawaiian recode (Native Hawaiian alone or in combination with one or more other races),2,Recodes,,1,1
-RACWHT,race_white,White recode (White alone or in combination with one or more other races),2,Edited Items,,1,1
-RNTP,rent_monthly,Monthly rent (use ADJHSG to adjust RNTP to constant dollars),2,Estimate,,0,0
-RWATPR,running_water,Running water,4,Estimate,,1,1
-SCH,school_enrollment,School enrollment,4,Estimate,,1,1
-DDRS,selfcare_difficulty,Self-care difficulty,3,Edited Items,,1,1
-SEX,sex,Sex,2,Edited Items,,1,1
-SMARTPHONE,smartphone,Smartphone,3,Estimate,,1,1
-SFR,subfamily_relationship,Subfamily relationship,7,Edited Items,,1,1
-TABLET,tablet,Tablet or other portable wireless computer,3,Estimate,,1,1
-TEL,telephone_service,Telephone service,4,Estimate,,1,1
-PARTNER,unmarried_partner_household,Unmarried partner household,6,Recodes,,1,1
-COW,worker_class,Class of worker,10,Estimate,,1,1
-WKHP,workhours_week,Usual hours worked per week past 12 months,3,Estimate,,0,1
+00 if under 1 year old",0,1,0
+DREM,cognitive_difficulty,Cognitive difficulty,3,Edited Items,,1,1,0
+FULP,cost_fuel,"Fuel cost (yearly cost for fuels other than gas and electricity, use ADJHSG to adjust FULP to constant dollars)",2,Estimate,,0,0,0
+GASP,cost_gas,"Gas cost (monthly cost, use ADJHSG to adjust GASP to constant dollars)",2,Estimate,,0,0,0
+PERNP,earnings_total,Total person's earnings (use ADJINC to adjust to constant dollars),5,Estimate,,0,0,0
+SCHL,educational_attainment,Educational attainment,25,Estimate,,1,1,0
+ELEP,electricity_cost,"Electricity cost (monthly cost, use ADJHSG to adjust ELEP to constant dollars)",2,Estimate,,0,0,0
+ESR,employment_status,Employment status recode,7,Recodes,,1,1,0
+ENG,english_language,Ability to speak English,5,Edited Items,,1,1,1
+FES,family_employment_status,Family type and employment status,9,Estimate,,1,1,0
+NPF,family_people_number,Number of persons in family (unweighted),2,Edited Items,,0,1,0
+FPARC,family_presence_age_children,Family presence and age of related children,5,Recodes,,1,1,0
+FOD1P,field_of_degree_1,Recoded field of degree - first entry,174,Recodes,,1,1,0
+FOD2P,field_of_degree_2,Recoded field of degree - second entry,174,Recodes,,1,1,0
+FS,food_stamps_yearly,Yearly food stamp/Supplemental Nutrition Assistance Program (SNAP) recipiency,3,Estimate,,1,1,0
+SCHG,grade_level_attending,Grade level attending,17,Estimate,,1,1,0
+GRNTP,gross_rent,"Gross rent (monthly amount, use ADJHSG to adjust GRNTP to constant dollars)",2,Estimate,,0,0,0
+GRPIP,gross_rent_pcnt_income,Gross rent as a percentage of household income past 12 months,3,Estimate,,0,0,0
+HICOV,health_insurance_coverage,Health insurance coverage recode,2,Recodes,,1,1,0
+R60,household_60_presence,Presence of persons 60 years and over in household (unweighted),4,Edited Items,,1,1,0
+HHT2,household_family_type,Household/family type (includes cohabiting),13,Estimate,,1,1,0
+NP,household_people_number,Number of persons in this household,3,Estimate,,0,1,0
+ADJINC,income_adjustment_factor,Adjustment factor for income and earnings dollar amounts (6 implied decimal places),1,Estimate,,0,0,0
+OIP,income_all,All other income past 12 months (use ADJINC to adjust to constant dollars),3,Estimate,,0,0,0
+FINCP,income_family,"Family income (past 12 months, use ADJINC to adjust FINCP to constant dollars)",5,Estimate,,0,0,0
+HINCP,income_household,"Household income (past 12 months, use ADJINC to adjust HINCP to constant dollars)",5,Estimate,,0,0,0
+INTP,income_interest_dividends_rental,"Interest, dividends, and net rental income past 12 months (signed, use ADJINC to adjust to constant dollars)",4,Estimate,,0,0,0
+PAP,income_public_assistance,Public assistance income past 12 months (use ADJINC to adjust to constant dollars),3,Estimate,,0,0,0
+RETP,income_retirement,Retirement income past 12 months (use ADJINC to adjust to constant dollars),3,Estimate,,0,0,0
+SEMP,income_self_employment,"Self-employment income past 12 months (signed, use ADJINC to adjust SEMP to constant dollars)",4,Estimate,,0,0,0
+SSP,income_social_security,Social Security income past 12 months (use ADJINC to adjust SSP to constant dollars),3,Estimate,,0,0,0
+SSIP,income_supplementary_security,Supplementary Security Income past 12 months (use ADJINC to adjust SSIP to constant dollars),3,Estimate,,0,0,0
+POVPIP,income_to_poverty_ratio,Income-to-poverty ratio recode,3,Recodes,,0,0,0
+PINCP,income_total,"Total person's income (signed, use ADJINC to adjust to constant dollars)",5,Estimate,,0,0,0
+WAGP,income_wages_salary,Wages or salary income past 12 months (use ADJINC to adjust WAGP to constant dollars),3,Estimate,,0,0,0
+ACCESS,internet,Access to the Internet,4,Estimate,,1,1,0
+BROADBND,internet_cellular_broadband,Cellular data plan for a smartphone or other mobile device,3,Estimate,,1,1,0
+HISPEED,internet_highspeed_broadband,"Broadband (high speed) Internet service such as cable, fiber optic, or DSL service",3,Estimate,,1,1,0
+SATELLITE,internet_satellite,Satellite Internet service,3,Estimate,,1,1,0
+LAPTOP,laptop,Laptop or desktop,3,Estimate,,1,1,0
+MAR,marital_status,Marital status,5,Edited Items,,1,1,0
+RNTM,meals_in_rent,Meals included in rent,3,Estimate,,1,1,0
+SMOCP,monthly_owner_costs,Selected monthly owner costs (use ADJHSG to adjust SMOCP to constant dollars),3,Estimate,,0,0,0
+MRGP,mortgage_first_payment,"First mortgage payment (monthly amount, use ADJHSG to adjust MRGP to constant dollars)",2,Estimate,,0,0,0
+SMP,mortgage_second_payment,"Total payment on all second and junior mortgages and home equity loans (monthly amount, use ADJHSG to adjust SMP to constant dollars)",2,Estimate,,0,0,0
+SOCP,occupation_code,Standard Occupational Classification (SOC) codes for 2018 and later based on 2018 SOC codes,531,Estimate,,1,1,0
+OC,own_child,Own child,3,Edited Items,,1,1,0
+NOC,own_children_number,Number of own children in household (unweighted),3,Estimate,,0,1,0
+PAOC,own_children_presence,Presence and age of own children,5,Estimate,,1,1,0
+NOP,parent_nativity,Nativity of parent,9,Recodes,,1,1,0
+ESP,parents_employment_status,Employment status of parents,9,Edited Items,,1,1,0
+SPORDER,person_number,Person number,1,Edited Items,,0,0,0
+VALP,property_value,Property value,2,Estimate,,0,0,0
+RACAIAN,race_aian,American Indian and Alaska Native recode (American Indian and Alaska Native alone or in combination with one or more other races),2,Edited Items,,1,1,1
+RACASN,race_asian,Asian recode (Asian alone or in combination with one or more other races),2,Edited Items,,1,1,1
+RACBLK,race_black,Black or African American recode (Black alone or in combination with one or more other races),2,Edited Items,,1,1,1
+RAC1P,race_detailed_1,Recoded detailed race code,9,Recodes,,1,1,0
+RACNH,race_nh,Native Hawaiian recode (Native Hawaiian alone or in combination with one or more other races),2,Recodes,,1,1,0
+RACWHT,race_white,White recode (White alone or in combination with one or more other races),2,Edited Items,,1,1,0
+RNTP,rent_monthly,Monthly rent (use ADJHSG to adjust RNTP to constant dollars),2,Estimate,,0,0,0
+RWATPR,running_water,Running water,4,Estimate,,1,1,0
+SCH,school_enrollment,School enrollment,4,Estimate,,1,1,0
+DDRS,selfcare_difficulty,Self-care difficulty,3,Edited Items,,1,1,0
+SEX,sex,Sex,2,Edited Items,,1,1,1
+SMARTPHONE,smartphone,Smartphone,3,Estimate,,1,1,0
+SFR,subfamily_relationship,Subfamily relationship,7,Edited Items,,1,1,0
+TABLET,tablet,Tablet or other portable wireless computer,3,Estimate,,1,1,0
+TEL,telephone_service,Telephone service,4,Estimate,,1,1,0
+PARTNER,unmarried_partner_household,Unmarried partner household,6,Recodes,,1,1,0
+COW,worker_class,Class of worker,10,Estimate,,1,1,0
+WKHP,workhours_week,Usual hours worked per week past 12 months,3,Estimate,,0,1,0

@@ -21,3 +21,4 @@ JOIN_COLUMN = 'SERIALNO'
 # Files
 OUTPUT_FILE = os.path.join(OUTPUT_PATH, 'out.csv')
 METADATA_FILE = os.path.join(METADATA_PATH, 'columns.csv')
+FIELD_MAPPING_FILE = os.path.join(METADATA_PATH, 'mapping.csv')
