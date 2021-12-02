@@ -54,7 +54,9 @@ function grid_search(X, y, solver_func, error_func, groups, groupKs, error_strat
 
 
     # Iterate over all combinations of parameters
+    iterCount = 0
     for param_comb in param_combinations
+        iterCount += 1
         println("**********************")
         println(param_comb)
         println("**********************")
@@ -79,8 +81,10 @@ function grid_search(X, y, solver_func, error_func, groups, groupKs, error_strat
     
     # Retrain the model on the whole training set 
     # using the best set of params
-    model_vars = solver_func(X,y;best_param_set...)
-    
+    # if iterCount >= 2 # dont repeat if only tested once
+        # model_vars = solver_func(X,y, groups, groupKs;best_param_set...)
+    # end
+
     # Return the model variable and the best params
     return model_vars, best_param_set
 end
@@ -127,6 +131,19 @@ end
 #########################################################################################################
 #########################################################################################################
 #########################################################################################################
+
+function writeBetas(betas_path, betas, cols)
+    grp1betas, grp1cols, grp2betas, grp2cols,  grp3betas, grp3cols,  grp4betas, grp4cols = plotGroups(betas, cols)
+    betas_df1 = DataFrame(grp1betas = grp1betas, grp1cols = grp1cols)
+    betas_df2 = DataFrame(grp2betas = grp2betas, grp2cols = grp2cols)
+    betas_df3 = DataFrame(grp3betas = grp3betas, grp3cols = grp3cols)
+    betas_df4 = DataFrame(grp4betas = grp4betas, grp4cols = grp4cols)
+    CSV.write("$(betas_path)1.csv", betas_df1)
+    CSV.write("$(betas_path)2.csv", betas_df2)
+    CSV.write("$(betas_path)3.csv", betas_df3)
+    CSV.write("$(betas_path)4.csv", betas_df4)
+end
+
 
 function printFeatures(betas, cols, isGroups = false; groups = [])    
     if isGroups
@@ -443,18 +460,9 @@ IAI.score(m, X_test, y_test)
 r2_c, mse_c = getMetrics(betas_iai, X_train, y_train, X_test, y_test)
 printFeatures(betas_iai, cols)
 
+betas_iai_path = "data/weights/betas_iai"
 
-grp1betas, grp1cols, grp2betas, grp2cols,  grp3betas, grp3cols,  grp4betas, grp4cols = plotGroups(betas_iai, cols)
-
-betas_iai_path = "data/output/betas_iai"
-betas_iai_df1 = DataFrame(grp1betas = grp1betas, grp1cols = grp1cols)
-betas_iai_df2 = DataFrame(grp2betas = grp2betas, grp2cols = grp2cols)
-betas_iai_df3 = DataFrame(grp3betas = grp3betas, grp3cols = grp3cols)
-betas_iai_df4 = DataFrame(grp4betas = grp4betas, grp4cols = grp4cols)
-CSV.write("$(betas_iai_path)1.csv", betas_iai_df1)
-CSV.write("$(betas_iai_path)2.csv", betas_iai_df2)
-CSV.write("$(betas_iai_path)3.csv", betas_iai_df3)
-CSV.write("$(betas_iai_path)4.csv", betas_iai_df4)
+writeBetas(betas_iai_path, betas_iai, cols)
 
 
 
@@ -496,17 +504,16 @@ global nzArr = Int[]
 global rsqArr = Float64[]
 
 
-# for seed = [19]
-for seed = 15:20
+for trial = 4:4
     cols = filter(x -> x ∉ excluded_cols, names(df))
-    Random.seed!(seed)
+    Random.seed!(trial)
     df2 = df[shuffle(1:nrow(df))[1:Nhol], :]
     X, y = Matrix{Float32}(df2[!, filter(x -> x != predictor_col, cols)]), df2[!,predictor_col]
     X_train, y_train, X_test, y_test = partitionTrainTest(X, y, 0.7);
     X_train = normalize_data(X_train, normalization_type; is_train=true);
     X_test = normalize_data(X_test, normalization_type; is_train=false);
 
-    try
+    # try
         # betas_holistic, params_holistic = grid_search(X_train, y_train, solve_holistic_regr, calc_r2,  groups, groupKs , "Max", 0.7; gamma=[0.5 1], rho=[0.5 0.7], k=[50 75])
         betas_holistic, params_holistic = grid_search(X_train, y_train, solve_holistic_regr, calc_r2,  groups, groupKs , "Max", 0.7; gamma=[0.5], rho=[0.5], k=[75])
         println("Workeed -- $(seed)")
@@ -518,20 +525,19 @@ for seed = 15:20
         r2_c = calc_r2(X_test, y_test, betas_holistic2)
         push!(rsqArr, r2_c)
         println("R2 = $(r2_c)")
-    catch
-        println("Error (probably psd) -- $(seed)")
-    end
+    # catch
+        # println("Error (probably psd) -- $(seed)")
+    # end
 end
 
 ############################################################################################### 
 printFeatures(betas_holistic, cols, true; groups)
 ###############################################################################################
-betas_holistic2 = [betas_holistic[end] ; betas_holistic[1:end-1]]
 
+betas_holistic2 = [betas_holistic[end] ; betas_holistic[1:end-1]]
 r2_c = calc_r2(X_test, y_test, betas_holistic2)
 mse_c = calc_mse(X_test, y_test, betas_holistic2)
 
-for i in 1:length(cols)
-    println("$i - $(cols[i])")
-end
+betas_hol_path = "data/weights/betas_hol"
+writeBetas(betas_hol_path, betas_holistic2, cols)
 
