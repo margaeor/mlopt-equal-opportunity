@@ -4,6 +4,8 @@ using Random
 using GLMNet, StatsBase
 using TimerOutputs
 using Gadfly
+using DataStructures
+using RDatasets
 
 const sparseTo = TimerOutput()
 
@@ -321,6 +323,54 @@ function sparse_regression(X,Y,k,γ,s0=[],is_binary=false; outFlag = 1, timeLimi
     end
 end
 
+function plotGroups(betas, cols)
+
+    grp1betas   = Float64[]
+    grp1cols    = String[]
+    grp1Counter = 0
+    grp2betas   = Float64[]
+    grp2cols    = String[]
+    grp2Counter = 0
+    grp3betas   = Float64[]
+    grp3cols    = String[]
+    grp3Counter = 0
+    grp4betas   = Float64[]
+    grp4cols    = String[]
+    grp4Counter = 0
+    THRESHOLD = 0.000001
+
+    for i in sortperm(abs.(betas[2:end]), rev=true)
+        if abs(betas[i+1])>=THRESHOLD
+
+            if occursin("field", cols[i])
+                println("$i - Group 1 : $(cols[i])")
+                push!(grp1betas, betas[i+1])
+                push!(grp1cols, cols[i])
+                grp1Counter += 1
+            elseif occursin("occupation", cols[i])
+                println("$i - Group 2 : $(cols[i])")
+                push!(grp2betas, betas[i+1])
+                push!(grp2cols, cols[i])
+                grp2Counter += 1
+            elseif occursin("selfcare", cols[i]) || occursin("sex", cols[i]) || occursin("cognitive", cols[i]) || occursin("race", cols[i]) || occursin("parents", cols[i])
+                println("$i - Group 3 : $(cols[i])")
+                push!(grp3betas, betas[i+1])
+                push!(grp3cols, cols[i])
+                grp3Counter += 1
+            else
+                println("$i - Group 4 : $(cols[i])")
+                push!(grp4betas, betas[i+1])
+                push!(grp4cols, cols[i])
+                grp4Counter += 1
+            end
+
+        end
+    end
+    println()
+    println("Group 1: $(grp1Counter) - Group 2: $(grp2Counter) - Group 3: $(grp3Counter) - Group 4: $(grp4Counter)")
+    return grp1betas, grp1cols, grp2betas, grp2cols,  grp3betas, grp3cols,  grp4betas, grp4cols
+end
+
 
 df = DataFrame(CSV.File(df_path, header=1))
 names(df)
@@ -370,7 +420,6 @@ betas_lasso = fit_lasso(X_train, y_train)
 getMetrics(betas_lasso, X_train, y_train, X_test, y_test)
 
 betas_sparse = sparse_regression(X_train, y_train, k ,1/sqrt(size(X_train,1)), 1.0*(betas_lasso[1:end-1] .>= 0.5), true, timeLimit = 120)
-reset_timer!(sparseTo)
 getMetrics(betas_sparse, X_train, y_train, X_test, y_test)
 printFeatures(betas_sparse, cols, false)
 
@@ -395,85 +444,20 @@ r2_c, mse_c = getMetrics(betas_iai, X_train, y_train, X_test, y_test)
 printFeatures(betas_iai, cols)
 
 
-using DataStructures
+grp1betas, grp1cols, grp2betas, grp2cols,  grp3betas, grp3cols,  grp4betas, grp4cols = plotGroups(betas_iai, cols)
 
-grp1betas, grp1cols, grp2betas, grp2cols = plotGroups(betas_iai, cols)
-
-Gadfly.push_theme(:dark)
-set_default_plot_size(60cm, 60cm)
-using dataset
-
-using RDatasets
-
-Gadfly.plot(grp1betas, x="Chest", y="Count", Geom.bar)
-
-plot(dataset("MASS", "nlschools"), x="IQ", y="Lang", color="COMB",
-            Geom.point, Geom.smooth(method=:lm), Guide.colorkey("Multi-Grade"))
-
-set_default_plot_size(60cm, 300cm)
-vstack(p1, p2)
-plot(p1, p2)
-theme(:dark)
-
-Pkg.add("Cairo")
-using Cairo 
-
-p1 = Gadfly.plot([sin,cos], 0, 2pi)
-p2 = Gadfly.plot((x,y)->sin(x)+cos(y), 0, 2pi, 0, 2pi)
-p3 = Gadfly.spy(ones(33)*sin.(0:(pi/16):2pi)' + cos.(0:(pi/16):2pi)*ones(33)')
-hstack(p1,p2,p3)
+betas_iai_path = "data/output/betas_iai"
+betas_iai_df1 = DataFrame(grp1betas = grp1betas, grp1cols = grp1cols)
+betas_iai_df2 = DataFrame(grp2betas = grp2betas, grp2cols = grp2cols)
+betas_iai_df3 = DataFrame(grp3betas = grp3betas, grp3cols = grp3cols)
+betas_iai_df4 = DataFrame(grp4betas = grp4betas, grp4cols = grp4cols)
+CSV.write("$(betas_iai_path)1.csv", betas_iai_df1)
+CSV.write("$(betas_iai_path)2.csv", betas_iai_df2)
+CSV.write("$(betas_iai_path)3.csv", betas_iai_df3)
+CSV.write("$(betas_iai_path)4.csv", betas_iai_df4)
 
 
 
-
-
-function plotGroups(betas, cols)
-
-    grp1betas   = Float64[]
-    grp1cols    = String[]
-    grp1Counter = 0
-    grp2betas   = Float64[]
-    grp2cols    = String[]
-    grp2Counter = 0
-    grp3betas   = Float64[]
-    grp3cols    = String[]
-    grp3Counter = 0
-    grp4betas   = Float64[]
-    grp4cols    = String[]
-    grp4Counter = 0
-    THRESHOLD = 0.000001
-
-    for i in sortperm(abs.(betas[2:end]), rev=true)
-        if abs(betas[i+1])>=THRESHOLD
-
-            if occursin("field", cols[i])
-                println("$i - Group 1 : $(cols[i])")
-                push!(grp1betas, betas[i+1])
-                push!(grp1cols, cols[i])
-                grp1Counter += 1
-            elseif occursin("occupation", cols[i])
-                println("$i - Group 2 : $(cols[i])")
-                push!(grp2betas, betas[i+1])
-                push!(grp2cols, cols[i])
-                grp2Counter += 1
-            elseif occursin("selfcare", cols[i]) || occursin("sex", cols[i]) || occursin("cognitive", cols[i]) || occursin("race", cols[i]) || occursin("parents", cols[i])
-                println("$i - Group 3 : $(cols[i])")
-                push!(grp3betas, betas[i+1])
-                push!(grp3cols, cols[i])
-                grp3Counter += 1
-            else
-                println("$i - Group 4 : $(cols[i])")
-                push!(grp4betas, betas[i+1])
-                push!(grp4cols, cols[i])
-                grp4Counter += 1
-            end
-
-        end
-    end
-    println()
-    println("Group 1: $(grp1Counter) - Group 2: $(grp2Counter) - Group 3: $(grp3Counter) - Group 4: $(grp4Counter)")
-    return grp1betas, grp1cols, grp2betas, grp2cols
-end
 
 ########################################################################
 ## █░█ █▀█ █░░ █ █▀ ▀█▀ █ █▀▀   █▀█ █▀▀ █▀▀ █▀█ █▀▀ █▀ █▀ █ █▀█ █▄░█  ##
@@ -511,10 +495,10 @@ global indexArr = Int[]
 global nzArr = Int[]
 global rsqArr = Float64[]
 
-# for seed = [19]
-for seed = 15:25
-cols = filter(x -> x ∉ excluded_cols, names(df))
 
+# for seed = [19]
+for seed = 15:20
+    cols = filter(x -> x ∉ excluded_cols, names(df))
     Random.seed!(seed)
     df2 = df[shuffle(1:nrow(df))[1:Nhol], :]
     X, y = Matrix{Float32}(df2[!, filter(x -> x != predictor_col, cols)]), df2[!,predictor_col]
@@ -523,20 +507,21 @@ cols = filter(x -> x ∉ excluded_cols, names(df))
     X_test = normalize_data(X_test, normalization_type; is_train=false);
 
     try
-        betas_holistic, params_holistic = grid_search(X_train, y_train, solve_holistic_regr, calc_r2,  groups, groupKs , "Max", 0.7; gamma=[0.5 1], rho=[0.5 0.7], k=[50 75])
+        # betas_holistic, params_holistic = grid_search(X_train, y_train, solve_holistic_regr, calc_r2,  groups, groupKs , "Max", 0.7; gamma=[0.5 1], rho=[0.5 0.7], k=[50 75])
+        betas_holistic, params_holistic = grid_search(X_train, y_train, solve_holistic_regr, calc_r2,  groups, groupKs , "Max", 0.7; gamma=[0.5], rho=[0.5], k=[75])
         println("Workeed -- $(seed)")
         nzeros = (length(betas_holistic[betas_holistic .!= 0]))
         println("NONZEROS = $(length(betas_holistic[betas_holistic .!= 0]))")
         push!(indexArr, seed)
         push!(nzArr, nzeros)
-
         betas_holistic2 = [betas_holistic[end] ; betas_holistic[1:end-1]]
         r2_c = calc_r2(X_test, y_test, betas_holistic2)
         push!(rsqArr, r2_c)
+        println("R2 = $(r2_c)")
     catch
         println("Error (probably psd) -- $(seed)")
     end
-# end
+end
 
 ############################################################################################### 
 printFeatures(betas_holistic, cols, true; groups)
