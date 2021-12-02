@@ -3,13 +3,15 @@ using DataFrames, CSV, IterTools
 using Random
 using GLMNet, StatsBase
 using TimerOutputs
+using Gadfly
+using DataStructures
+using RDatasets
 
 const sparseTo = TimerOutput()
 
 seed = 2
 gurobi_env = Gurobi.Env()
 Random.seed!(seed)
-
 df_path = "data/output/preprocessed.csv"
 predictor_col = "income_total"
 normalization_type = "std"
@@ -28,12 +30,8 @@ function calc_mse(X, y, beta)
     return sum((X*beta .- y).^2)/n
 end
 
-# function compute_mse(X, y, beta, beta0)
-#     n,p = size(X)
-#     return sum((beta0 .+ X*beta .- y).^2)/n
-# end
 
-function grid_search(X, y, solver_func, error_func, error_strategy="Min",train_val_ratio=0.7;params... )
+function grid_search(X, y, solver_func, error_func, groups, groupKs, error_strategy="Min",train_val_ratio=0.7; params... )
 
     # Split the data into training/validation
     X_train, y_train, X_val, y_val = partitionTrainTest(X, y, train_val_ratio);
@@ -49,12 +47,20 @@ function grid_search(X, y, solver_func, error_func, error_strategy="Min",train_v
     error_multiplier = error_strategy == "Min" ? 1 : -1
     best_error = Inf # We consider minimization
     best_param_set = []
-    
+    # println("----------------------------------------")    
+    # println(param_combinations)
+    # println("----------------------------------------")
+    # println(param_combinations)
+
+
     # Iterate over all combinations of parameters
     for param_comb in param_combinations
+        println("**********************")
+        println(param_comb)
+        println("**********************")
         
         # Optimize model and find optimal variables
-        model_vars = solver_func(X_train,y_train;param_comb...)
+        global model_vars = solver_func(X_train,y_train, groups, groupKs;param_comb...)
         
         # Evaluate model error on validation set
         if model_vars isa Tuple
@@ -77,6 +83,112 @@ function grid_search(X, y, solver_func, error_func, error_strategy="Min",train_v
     
     # Return the model variable and the best params
     return model_vars, best_param_set
+end
+
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
+function solve_holistic_regr(X,y, groups, groupKs;gamma,rho,k, outFlag = 1)
+    C = cor(X)
+    n,p = size(X)
+    X_aug = augment_X(X, true)
+    M = 10^5
+    # m = Model(with_optimizer(Gurobi.Optimizer, gurobi_env))
+    m = Model(with_optimizer(Gurobi.Optimizer))
+    set_optimizer_attribute(m, "OutputFlag", outFlag)
+    set_optimizer_attribute(m, "PSDTol", 1)
+    # set_optimizer_attribute(m, "NonConvex", 2)
+    set_optimizer_attribute(m, "TimeLimit", 60)
+    @variable(m, beta[1:(p+1)])
+    @variable(m, z[1:p],Bin)
+    @variable(m, t[1:p])
+    @objective(m, Min, 1/2*sum((X_aug*beta.-y).^2)+gamma*sum(t[i] for i=1:p))
+    @constraint(m, [i=1:p], t[i]>= beta[i])
+    @constraint(m, [i=1:p], t[i]>= -beta[i])
+    @constraint(m, [i=1:p], beta[i]<= M*z[i])
+    @constraint(m, [i=1:p], -M*z[i]<=beta[i])
+    @constraint(m, sum(z)<=k)
+
+    for (index, group) in enumerate(groups)
+        @constraint(m, sum(z[i] for i in group)<=groupKs[index])
+    end
+
+    for i in 1:p
+        for j in i+1:p
+            if abs(C[i,j]) > rho
+                @constraint(m, z[i]+z[j] <= 1)
+            end
+        end
+    end
+
+    optimize!(m)
+    return JuMP.value.(beta)
+end
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
+
+function printFeatures(betas, cols, isGroups = false; groups = [])    
+    if isGroups
+        for (index, group) in enumerate(groups)
+            println("Features selected from Group $(index) :")  
+            
+            # sortperm(abs.(betas[2:end]), rev=true)
+            grpCounter = 0
+            tmpBetas = betas_holistic[sort!(collect(group))]
+            tmpCols = cols[sort!(collect(group))]
+            for i in sortperm(abs.(tmpBetas), rev=true)
+                if tmpBetas[i] != 0
+                    grpCounter = grpCounter + 1;
+                    println("$i - $(tmpBetas[i]) - $(tmpCols[i])")
+                end
+            end
+            println("Total: $(grpCounter) Features from Group $(index)")
+            println("--------------------------------------------------")
+        end
+    else
+        THRESHOLD = 0.000001
+        grpCounter = 0
+
+        for i in sortperm(abs.(betas[2:end]), rev=true)
+            grpCounter = grpCounter + 1;
+
+            if abs(betas[i+1])<=THRESHOLD
+                grpCounter = grpCounter - 1;
+                continue
+            end
+            println("- $(cols[i]) : $(betas[i+1])")
+        end
+        println("Total: $(grpCounter) Features")
+        println("-----------------------------")
+    end 
+end
+
+function getMetrics(betas, X_train, y_train, X_test, y_test)    
+    r2_c = calc_r2(X_test, y_test, betas)
+    mse_c = calc_mse(X_test, y_test, betas)
+    println("r^2 train $(calc_r2(X_train, y_train, betas))")
+    println("r^2 test $(calc_r2(X_test, y_test, betas))")
+    println("mse train $(calc_mse(X_train, y_train, betas))")
+    println("mse test $(calc_mse(X_test, y_test, betas))")
+    return r2_c, mse_c
+end
+
+
+function iai2betas(learner, p)
+    beta0 = IAI.get_prediction_constant(learner)
+    betas = IAI.get_prediction_weights(learner)[1]
+    
+    features = string.(collect(keys(betas)))
+
+    beta_coeffs = zeros(p)
+    for i = 1:p
+        if "x$i" in features
+            beta_coeffs[i] = betas[Symbol("x$i")]
+        end
+    end
+            
+    return [beta0 ; beta_coeffs]
 end
 
 function normalize_data(X, method="minmax"; is_train=true)
@@ -103,38 +215,14 @@ function partitionTrainTest(X,y, at = 0.7, s=seed)
     return X[train_idx,:], y[train_idx], X[test_idx,:], y[test_idx]
 end
 
-function augment_X(X)
-    return [ones(size(X,1),1) X]
+function augment_X(X, flag = false)
+    if flag
+        return [X ones(size(X,1),1)]
+    else        
+        return [ones(size(X,1),1) X]
+    end
 end
 
-function solve_holistic_regr(X,y;gamma,rho,k)
-    C = cor(X)
-    n,p = size(X)
-    X_aug = augment_X(X)
-    M = 10^5
-    m = Model(with_optimizer(Gurobi.Optimizer, gurobi_env))
-    set_optimizer_attribute(m, "OutputFlag", 0)
-    set_optimizer_attribute(m, "PSDTol", 1)
-    @variable(m, beta[1:(p+1)])
-    @variable(m, z[1:p],Bin)
-    @variable(m, t[1:p])
-    @objective(m, Min, 1/2*sum((X_aug*beta.-y).^2)+gamma*sum(t[i] for i=1:p))
-    @constraint(m, [i=1:p], t[i]>= beta[i])
-    @constraint(m, [i=1:p], t[i]>= -beta[i])
-    @constraint(m, [i=1:p], beta[i]<= M*z[i])
-    @constraint(m, [i=1:p], -M*z[i]<=beta[i])
-    @constraint(m, sum(z)<=k)
-    #@constraint(m, [i=1:4:p-3], sum(z[i+j] for j=0:3)<=1)
-    #     for i in 1:p
-    #         for j in i+1:p
-    #             if abs(C[i,j]) > rho
-    #                 @constraint(m, z[i]+z[j] <= 1)
-    #             end
-    #         end
-    #     end
-    optimize!(m)
-    return JuMP.value.(beta)
-end
 
 function fit_lasso(X, y)
     cv = glmnetcv(X, y);
@@ -155,11 +243,11 @@ function solve_inner_problem(X,Y,s,γ)
   return obj, grad
 end
 
-function sparse_regression(X,Y,k,γ,s0=[],is_binary=false; outFlag = 1)
+function sparse_regression(X,Y,k,γ,s0=[],is_binary=false; outFlag = 1, timeLimit = 60)
     @timeit sparseTo "Sparse Regression" begin
         m = Model(Gurobi.Optimizer)
         set_optimizer_attribute(m, "OutputFlag", outFlag)
-        set_optimizer_attribute(m, "TimeLimit", 45)
+        set_optimizer_attribute(m, "TimeLimit", timeLimit)
         n,p = size(X)
         
         ###
@@ -235,12 +323,58 @@ function sparse_regression(X,Y,k,γ,s0=[],is_binary=false; outFlag = 1)
     end
 end
 
+function plotGroups(betas, cols)
+
+    grp1betas   = Float64[]
+    grp1cols    = String[]
+    grp1Counter = 0
+    grp2betas   = Float64[]
+    grp2cols    = String[]
+    grp2Counter = 0
+    grp3betas   = Float64[]
+    grp3cols    = String[]
+    grp3Counter = 0
+    grp4betas   = Float64[]
+    grp4cols    = String[]
+    grp4Counter = 0
+    THRESHOLD = 0.000001
+
+    for i in sortperm(abs.(betas[2:end]), rev=true)
+        if abs(betas[i+1])>=THRESHOLD
+
+            if occursin("field", cols[i])
+                println("$i - Group 1 : $(cols[i])")
+                push!(grp1betas, betas[i+1])
+                push!(grp1cols, cols[i])
+                grp1Counter += 1
+            elseif occursin("occupation", cols[i])
+                println("$i - Group 2 : $(cols[i])")
+                push!(grp2betas, betas[i+1])
+                push!(grp2cols, cols[i])
+                grp2Counter += 1
+            elseif occursin("selfcare", cols[i]) || occursin("sex", cols[i]) || occursin("cognitive", cols[i]) || occursin("race", cols[i]) || occursin("parents", cols[i])
+                println("$i - Group 3 : $(cols[i])")
+                push!(grp3betas, betas[i+1])
+                push!(grp3cols, cols[i])
+                grp3Counter += 1
+            else
+                println("$i - Group 4 : $(cols[i])")
+                push!(grp4betas, betas[i+1])
+                push!(grp4cols, cols[i])
+                grp4Counter += 1
+            end
+
+        end
+    end
+    println()
+    println("Group 1: $(grp1Counter) - Group 2: $(grp2Counter) - Group 3: $(grp3Counter) - Group 4: $(grp4Counter)")
+    return grp1betas, grp1cols, grp2betas, grp2cols,  grp3betas, grp3cols,  grp4betas, grp4cols
+end
+
+
 df = DataFrame(CSV.File(df_path, header=1))
-# df = last(df, 1000)
-df = df[shuffle(1:nrow(df))[1:300000], :]
-
 names(df)
-
+dfSmall = df[shuffle(1:nrow(df))[1:10000], :]
 excluded_cols = [
     "earnings_total",
     "income_interest_dividends_rental",
@@ -259,67 +393,45 @@ excluded_cols = [
     "gross_rent",
     "person_number",
     "rent_monthly",
-    "property_value"
+    # "property_value",
+    "mortgage_first_payment",
+    "gross_rent_pcnt_income",
+    "electricity_cost",
+    "cost_gas",
+    "cost_fuel",
+    "income_adjustment_factor"
 ]
 cols = filter(x -> x ∉ excluded_cols, names(df))
-X, y = Matrix{Float32}(df[!, filter(x -> x != predictor_col, cols)]), df[!,predictor_col]
 
+
+################################################################### 
+## █▀ █▀█ ▄▀█ █▀█ █▀ █▀▀   █▀█ █▀▀ █▀▀ █▀█ █▀▀ █▀ █▀ █ █▀█ █▄░█  ##
+## ▄█ █▀▀ █▀█ █▀▄ ▄█ ██▄   █▀▄ ██▄ █▄█ █▀▄ ██▄ ▄█ ▄█ █ █▄█ █░▀█  ##
+###################################################################
+X, y = Matrix{Float32}(df[!, filter(x -> x != predictor_col, cols)]), df[!,predictor_col]
 X_train, y_train, X_test, y_test = partitionTrainTest(X, y, 0.7);
 X_train = normalize_data(X_train, normalization_type; is_train=true);
-# y_train = normalize_data(y_train; is_train=true);
 X_test = normalize_data(X_test, normalization_type; is_train=false);
-# y_test = normalize_data(y_test; is_train=false);
 
 
 k = 50
-#betas, params = grid_search(X_train, y_train, solve_holistic_regr, calc_r2, "Max", 0.7; gamma=[0.1], rho=[0.7], k=[20])
-#betas = fit_lasso(X_train, y_train)
 reset_timer!(sparseTo)
 betas_lasso = fit_lasso(X_train, y_train)
-betas = sparse_regression(X_train, y_train, k ,1/sqrt(size(X_train,1)), 1.0*(betas_lasso[2:end] .>= 0.5), true)
-sparseTo
+getMetrics(betas_lasso, X_train, y_train, X_test, y_test)
+
+betas_sparse = sparse_regression(X_train, y_train, k ,1/sqrt(size(X_train,1)), 1.0*(betas_lasso[1:end-1] .>= 0.5), true, timeLimit = 120)
+getMetrics(betas_sparse, X_train, y_train, X_test, y_test)
+printFeatures(betas_sparse, cols, false)
 
 
-r2_c = calc_r2(X_test, y_test, betas)
-mse_c = calc_mse(X_test, y_test, betas)
+#################################################################################
+## █ ▄▀█ █   █▀▀ █▀▀ ▄▀█ ▀█▀ █░█ █▀█ █▀▀   █▀ █▀▀ █░░ █▀▀ █▀▀ ▀█▀ █ █▀█ █▄░█   ##
+## █ █▀█ █   █▀░ ██▄ █▀█ ░█░ █▄█ █▀▄ ██▄   ▄█ ██▄ █▄▄ ██▄ █▄▄ ░█░ █ █▄█ █░▀█   ##
+#################################################################################
 
-println("r^2 train $(calc_r2(X_train, y_train, betas))")
-println("r^2 test $(calc_r2(X_test, y_test, betas))")
-println("mse train $(calc_mse(X_train, y_train, betas))")
-println("mse test $(calc_mse(X_test, y_test, betas))")
-
-reset_timer!(sparseTo)
-
-#cols = filter(x -> x ∉ excluded_cols, names(df))
-#important_features = cols[findall(abs.(betas_hol) .>= 0.01)]
-THRESHOLD = 0.000001
-println("Most important features:")
-for i in sortperm(abs.(betas[2:end]), rev=true)
-    if abs(betas[i+1])<=THRESHOLD
-        continue
-    end
-    println("- $(cols[i]) : $(betas[i+1])")
-end
-
-function iai2betas(learner, p)
-    beta0 = IAI.get_prediction_constant(learner)
-    betas = IAI.get_prediction_weights(learner)[1]
-    
-    features = string.(collect(keys(betas)))
-
-    beta_coeffs = zeros(p)
-    for i = 1:p
-        if "x$i" in features
-            beta_coeffs[i] = betas[Symbol("x$i")]
-        end
-    end
-            
-    return [beta0 ; beta_coeffs]
-end
-
-@time begin    
+@time begin
     m = IAI.OptimalFeatureSelectionRegressor(
-        sparsity=50
+        sparsity=70
     )
     res = IAI.fit!(m, X_train, y_train)
 end
@@ -328,21 +440,98 @@ betas_iai = iai2betas(m, size(X,2))
 
 IAI.score(m, X_train, y_train)
 IAI.score(m, X_test, y_test)
-
-r2_c = calc_r2(X_test, y_test, betas_iai)
-mse_c = calc_mse(X_test, y_test, betas_iai)
-
-println("r^2 train $(calc_r2(X_train, y_train, betas_iai))")
-println("r^2 test $(calc_r2(X_test, y_test, betas_iai))")
-println("mse train $(calc_mse(X_train, y_train, betas_iai))")
-println("mse test $(calc_mse(X_test, y_test, betas_iai))")
+r2_c, mse_c = getMetrics(betas_iai, X_train, y_train, X_test, y_test)
+printFeatures(betas_iai, cols)
 
 
-THRESHOLD = 0.000001
-for i in sortperm(abs.(betas_iai[2:end]), rev=true)
-    if abs(betas_iai[i+1])<=THRESHOLD
-        continue
+grp1betas, grp1cols, grp2betas, grp2cols,  grp3betas, grp3cols,  grp4betas, grp4cols = plotGroups(betas_iai, cols)
+
+betas_iai_path = "data/output/betas_iai"
+betas_iai_df1 = DataFrame(grp1betas = grp1betas, grp1cols = grp1cols)
+betas_iai_df2 = DataFrame(grp2betas = grp2betas, grp2cols = grp2cols)
+betas_iai_df3 = DataFrame(grp3betas = grp3betas, grp3cols = grp3cols)
+betas_iai_df4 = DataFrame(grp4betas = grp4betas, grp4cols = grp4cols)
+CSV.write("$(betas_iai_path)1.csv", betas_iai_df1)
+CSV.write("$(betas_iai_path)2.csv", betas_iai_df2)
+CSV.write("$(betas_iai_path)3.csv", betas_iai_df3)
+CSV.write("$(betas_iai_path)4.csv", betas_iai_df4)
+
+
+
+
+########################################################################
+## █░█ █▀█ █░░ █ █▀ ▀█▀ █ █▀▀   █▀█ █▀▀ █▀▀ █▀█ █▀▀ █▀ █▀ █ █▀█ █▄░█  ##
+## █▀█ █▄█ █▄▄ █ ▄█ ░█░ █ █▄▄   █▀▄ ██▄ █▄█ █▀▄ ██▄ ▄█ ▄█ █ █▄█ █░▀█  ##
+########################################################################
+
+seed = 4
+Nhol = 5000
+grpAll = Set(1:length(cols))
+fodInit = 205; fodEnd = 241
+ # FIELD OF DEGREE GROUP ------------------------------- 1
+grp1 = Set(fodInit:fodEnd)
+socInit = 102; socEnd = 127
+# OCCUPATION CODE GROUP -------------------------------- 2
+grp2 = Set(socInit:socEnd) 
+# A-PRIORI TRAITS (Sex, Race, Disabilities) GROUP ------ 3
+# SEX GROUP
+sexInit = 173; sexEnd = 175;
+sexGrp = Set(sexInit:sexEnd)
+# DISABILITIES GROUP
+disInit1 = 9; disEnd1 = 11;
+disInit2 = 170; disEnd2 = 172;
+disGrp = union(Set(disInit1:disEnd1), Set(disInit2:disEnd2))
+# RACE GROUP
+raceInit = 137; raceEnd = 163;
+raceGrp = Set(raceInit:raceEnd)
+# UNITE ALL
+grp3 = union(raceGrp, disGrp, sexGrp)
+grp4 = setdiff(grpAll, union(grp1, grp2, grp3))
+
+groups = [grp1 grp2 grp3 grp4]
+groupKs = [20 25 30 25]
+
+global indexArr = Int[]
+global nzArr = Int[]
+global rsqArr = Float64[]
+
+
+# for seed = [19]
+for seed = 15:20
+    cols = filter(x -> x ∉ excluded_cols, names(df))
+    Random.seed!(seed)
+    df2 = df[shuffle(1:nrow(df))[1:Nhol], :]
+    X, y = Matrix{Float32}(df2[!, filter(x -> x != predictor_col, cols)]), df2[!,predictor_col]
+    X_train, y_train, X_test, y_test = partitionTrainTest(X, y, 0.7);
+    X_train = normalize_data(X_train, normalization_type; is_train=true);
+    X_test = normalize_data(X_test, normalization_type; is_train=false);
+
+    try
+        # betas_holistic, params_holistic = grid_search(X_train, y_train, solve_holistic_regr, calc_r2,  groups, groupKs , "Max", 0.7; gamma=[0.5 1], rho=[0.5 0.7], k=[50 75])
+        betas_holistic, params_holistic = grid_search(X_train, y_train, solve_holistic_regr, calc_r2,  groups, groupKs , "Max", 0.7; gamma=[0.5], rho=[0.5], k=[75])
+        println("Workeed -- $(seed)")
+        nzeros = (length(betas_holistic[betas_holistic .!= 0]))
+        println("NONZEROS = $(length(betas_holistic[betas_holistic .!= 0]))")
+        push!(indexArr, seed)
+        push!(nzArr, nzeros)
+        betas_holistic2 = [betas_holistic[end] ; betas_holistic[1:end-1]]
+        r2_c = calc_r2(X_test, y_test, betas_holistic2)
+        push!(rsqArr, r2_c)
+        println("R2 = $(r2_c)")
+    catch
+        println("Error (probably psd) -- $(seed)")
     end
-    println("- $(cols[i]) : $(betas_iai[i+1])")
+end
+
+############################################################################################### 
+printFeatures(betas_holistic, cols, true; groups)
+###############################################################################################
+betas_holistic2 = [betas_holistic[end] ; betas_holistic[1:end-1]]
+
+r2_c = calc_r2(X_test, y_test, betas_holistic2)
+mse_c = calc_mse(X_test, y_test, betas_holistic2)
+
+for i in 1:length(cols)
+    println("$i - $(cols[i])")
 end
 
