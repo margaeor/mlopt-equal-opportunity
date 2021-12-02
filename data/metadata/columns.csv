@@ -45,7 +45,7 @@ RNTM,meals_in_rent,Meals included in rent,3,Estimate,,1,1,0,1
 SMOCP,monthly_owner_costs,Selected monthly owner costs (use ADJHSG to adjust SMOCP to constant dollars),3,Estimate,,0,0,0,0
 MRGP,mortgage_first_payment,"First mortgage payment (monthly amount, use ADJHSG to adjust MRGP to constant dollars)",2,Estimate,,0,0,0,0
 SMP,mortgage_second_payment,"Total payment on all second and junior mortgages and home equity loans (monthly amount, use ADJHSG to adjust SMP to constant dollars)",2,Estimate,,0,0,0,0
-SOCP,occupation_code,Standard Occupational Classification (SOC) codes for 2018 and later based on 2018 SOC codes,531,Estimate,,1,1,0,0
+SOCP,occupation_code,Standard Occupational Classification (SOC) codes for 2018 and later based on 2018 SOC codes,531,Estimate,,1,1,0,1
 OC,own_child,Own child,3,Edited Items,,1,1,0,1
 NOC,own_children_number,Number of own children in household (unweighted),3,Estimate,,0,1,0,1
 PAOC,own_children_presence,Presence and age of own children,5,Estimate,,1,1,0,1

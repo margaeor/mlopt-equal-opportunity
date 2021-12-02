@@ -1,4 +1,6 @@
 import time
+import os
+os.environ['PATH'] += ';'+'C:\\Program Files\\Poppler\\bin'
 
 import pandas as pd
 import numpy as np
@@ -19,7 +21,11 @@ from gurobipy import Model, GRB
 import random
 from tqdm import tqdm
 from sklearn.metrics import r2_score
+import plotly.graph_objects as go
+import plotly.offline as pyo
 from sklearn import linear_model
+from plotly.subplots import make_subplots
+from plotly.colors import DEFAULT_PLOTLY_COLORS
 
 #coefficient_of_dermination = r2_score(y, p(x))
 
@@ -65,6 +71,76 @@ def perform_kmeans(X, k, sk=True):
     #print(distortion)
 
     return distortion, clusters, kmeans
+
+def plot_spider(df, categorical_cols, cluster_col, titles, labels=None, export=None):
+
+
+    rows = (len(categorical_cols)+1)//2
+    cols = 2
+
+    fig = make_subplots(
+        rows=rows, cols=cols,
+        specs=[[{"type": "polar"} for _ in range(cols)] for _ in range(rows)],
+        subplot_titles=titles
+    )
+
+    for j, categorical_col in enumerate(categorical_cols):
+        df_tmp = df.groupby(cluster_col)[categorical_col].value_counts(normalize=True).mul(100).rename(
+            'percentage').reset_index()
+
+        if labels is None:
+            labels = df_tmp[[categorical_col, 'percentage']].groupby(categorical_col).std().dropna().sort_values('percentage').tail(
+                10).index.to_list()
+
+        labels = [*labels, labels[0]]
+
+        spider_vals = []
+
+        for c in df[cluster_col].sort_values().unique():
+            tmp = []
+            for l in labels:
+                df_row = df_tmp.loc[(df_tmp[cluster_col] == c) & (df_tmp[categorical_col] == l), 'percentage']
+                tmp.append(0 if df_row.shape[0] == 0 else df_row.iloc[0])
+            spider_vals.append(tmp)
+
+        # spider_vals = [[df_tmp.loc[(df_tmp.cluster == c) & (df_tmp.z_id_desc == l), 'percentage'].iloc[0] for l in all_labels] for c in range(self.k)]
+        spider_vals = [[*val, val[0]] for val in spider_vals]
+
+        show_legend = j==0
+        for i, cluster in enumerate(spider_vals):
+            if i==0:
+                fig.add_trace(
+                    go.Scatterpolar(r=cluster, theta=labels, name=f'Cluster {i}', fill='toself',
+                                    legendgroup=f'group{i}', showlegend=show_legend), j // 2 + 1, j % 2 + 1
+                )
+            else:
+                fig.append_trace(
+                    go.Scatterpolar(r=cluster, theta=labels, name=f'Cluster {i}', fill='toself',legendgroup=f'group{i}',
+                                    showlegend=show_legend), j//2+1, j%2+1
+                )
+        # fig.add_trace(go.Figure(
+        #     data=[
+        #         go.Scatterpolar(r=cluster, theta=labels, name=f'Cluster {i}', fill='toself') for i, cluster in
+        #         enumerate(spider_vals)
+        #     ],
+        #     layout=go.Layout(
+        #         title=go.layout.Title(text='Restaurant comparison'),
+        #         polar={'radialaxis': {'visible': True}},
+        #         showlegend=True,
+        #         template="plotly_dark"
+        #         # paper_bgcolor='rgb(0,0,0)',
+        #     )
+        # ))
+    fig.update_layout(
+        #title=go.layout.Title(text='Restaurant comparison'),
+        polar={'radialaxis': {'visible': True}},
+        showlegend=True,
+        template="plotly_dark"
+    )
+    if export:
+        fig.write_image(export)
+
+    pyo.plot(fig)
 
 def find_col_names_from_dummy_cols(df, clust_cols):
 
@@ -175,9 +251,10 @@ class KNNPredictor:
         print(f"R squared {s} {df.shape[0]}: {r2_score(df[self.outcome_col].to_numpy(), y_pred)}")
 
 
+
 class CustomClustering:
 
-    def __init__(self, k, y_col_name, possible_interventions, treatment_desc):
+    def __init__(self, k, y_col_name, possible_interventions, treatment_desc, intervention_cols, use_global_predictor=True):
 
         self.X = None
         self.y = None
@@ -191,14 +268,18 @@ class CustomClustering:
         self.kmeans = None
         self.final_cluster_cols = None
         self.possible_interventions = [i for i in possible_interventions if not pd.isna(i) and i != 0]
+        self.intervention_cols = intervention_cols
         self.knn_predictors = []
+        self.global_predictor = None
         self.treatment_desc = {k:v for k,v in treatment_desc.items() if k in self.possible_interventions}
         self.z_avg_all = None
-
-
+        self.intervention_col = 'occupation_code'
+        self.use_global_predictor = use_global_predictor
+        self.df_train = None
 
     def fit(self, df, clust_cols, knn_cols):
 
+        self.df_train = df
         df = df.copy()
 
         KNN_K = 10
@@ -212,13 +293,18 @@ class CustomClustering:
 
         self.knn_predictors = []
 
-        for intervention in self.possible_interventions:
 
-            # For every intervention train a KNN predictor to predict the
-            # outcome
-            pred = KNNPredictor(outcome_col=self.outcome_col, k=KNN_K)
-            pred.fit(df.loc[df.z_id == intervention, self.final_knn_cols | {'income_total'}])
-            self.knn_predictors.append(pred)
+        if self.use_global_predictor:
+            self.global_predictor = KNNPredictor(outcome_col=self.outcome_col, k=KNN_K)
+            self.global_predictor.fit(df.loc[:, self.final_knn_cols | {'income_total'}])
+        else:
+            for intervention in self.possible_interventions:
+
+                # For every intervention train a KNN predictor to predict the
+                # outcome
+                pred = KNNPredictor(outcome_col=self.outcome_col, k=KNN_K)
+                pred.fit(df.loc[df.z_id == intervention, self.final_knn_cols | {'income_total'}])
+                self.knn_predictors.append(pred)
 
 
 
@@ -383,10 +469,25 @@ class CustomClustering:
         # nearest neighbors of y which have treatment z_i
 
         y_knn_all = []
-        for z, predictor in zip(self.possible_interventions, self.knn_predictors):
-            _, y_pred = predictor.predict(df_og)
-            predictor.evaluate(df_og[df_og.z_id == z], is_train=False)
-            y_knn_all.append(y_pred)
+
+        if self.use_global_predictor:
+            df_tmp = df_og.copy()
+
+            for i, z in enumerate(self.possible_interventions):
+
+                df_tmp.loc[:, self.intervention_cols] = 0
+                df_tmp.loc[:, self.intervention_cols[i]] = 1
+                _, y_pred = self.global_predictor.predict(df_tmp)
+                #self.holistic_predictor.evaluate(df_tmp, is_train=False)
+                y_knn_all.append(y_pred)
+
+            self.global_predictor.evaluate(df_og, is_train=False)
+        else:
+
+            for z, predictor in zip(self.possible_interventions, self.knn_predictors):
+                _, y_pred = predictor.predict(df_og)
+                predictor.evaluate(df_og[df_og.z_id == z], is_train=False)
+                y_knn_all.append(y_pred)
 
         y_knn_all = np.array(y_knn_all).T
 
@@ -395,7 +496,7 @@ class CustomClustering:
             lambda x: self.possible_interventions[np.argmax(self.N_clust_avg[x.cluster, :] * y_knn_all[x.name, :])],
             axis=1)
 
-        rho_list = [0.1, 0.5, 2, 3, 5, 10]
+        rho_list = [0.5, 1, 3, 5, 7, 10]
 
         self.prescribe_group(df, y_knn_all, rho_list)
 
@@ -412,11 +513,12 @@ class CustomClustering:
             #df['z_pred_2_desc'] = df['z_pred_2'].apply(map_to_name)
             #df['z_pred_3_desc'] = df['z_pred_3'].apply(map_to_name)
 
+        self.df_train['z_id_desc'] = self.df_train['z_id'].apply(map_to_name)
         df['z_id_desc'] = df['z_id'].apply(map_to_name)
         df['z_idx'] = df['z_id'].apply(map_to_idx)
         label_order = pd.value_counts(df.z_id_desc).iloc[:10].index
 
-        ax = sns.countplot(x="z_id_desc", data=df, order=label_order)
+        ax = sns.countplot(x="z_id_desc", data=self.df_train, order=label_order)
         plt.xticks(rotation=45)
         plt.title('Original Distribution')
         plt.show()
@@ -445,6 +547,38 @@ class CustomClustering:
         plt.xlabel(r'$\rho$')
         plt.show()
         print('hi')
+
+        df_tmp = df.groupby('cluster')['z_id_desc'].value_counts(normalize=True).mul(100).rename(
+            'percentage').reset_index()
+
+
+
+        ######################################
+        # Spider plot
+
+        labels = df_tmp[['z_id_desc', 'percentage']].groupby('z_id_desc').sum().dropna().sort_values(
+            'percentage').tail(
+            10).index.to_list()+['ENG']
+
+        chosen_rho_id = 1
+        df['z_pred_3_desc_chosen'] = df[f'z_pred_3_desc'].apply(lambda x: x[chosen_rho_id])
+
+        spider_col_names = ['z_id_desc',  'z_pred_3_desc_chosen']
+        titles = ['Original distribution', f'Distribution after prescription $\\rho={rho_list[chosen_rho_id]}$']
+        plot_spider(df, spider_col_names, 'cluster', labels=labels, export='exports/grouped.svg', titles=titles)
+        time.sleep(1)
+
+
+        #plot_spider(df, 'z_pred_3_desc_chosen', 'cluster', labels=labels, export='exports/prescribed.svg')
+
+        #####################################
+
+        #df_tmp = df.groupby('cluster')['z_id_desc'].value_counts(normalize=True).mul(100).rename('percentage').reset_index().pipe((sns.catplot, 'data'), kind="bar", x='z_id_desc',col='cluster')
+        df_tmp.pipe((sns.catplot, 'data'), x='z_id_desc', y='percentage', kind='bar', order=label_order, col='cluster',col_wrap=2)
+        [ax.set_xticklabels(label_order.to_list(), rotation=45) for ax in plt.gcf().axes]
+        [ax.set_xlabel('Occupation Category') for ax in plt.gcf().axes]
+        plt.show()
+
         # ax = sns.countplot(x="z_pred_2_desc", data=df, order=label_order)
         # plt.xticks(rotation=45)
         # plt.title('Occupation distribution in test: Prescription 2')
@@ -455,17 +589,19 @@ class CustomClustering:
         # plt.title('Occupation distribution in test: Prescription 3')
         # plt.show()
 
-        #ax = sns.countplot(x="z_id_desc", data=df)
+        # ax = sns.countplot(x="z_id_desc", data=df)
         # sns.catplot(x="z_id_desc", col="cluster", data=df, kind="count", height=4, aspect=1,
         #             order=label_order, col_wrap=3)
+        # #plt.show()
         # [ax.set_xticklabels(label_order.to_list(), rotation=45) for ax in plt.gcf().axes]
         # #[ax.set_xticklabels(ax.get_xticklabels(), rotation=45) for ax in plt.gcf().axes]
         # #plt.title('Actual Occupation distribution in test')
         # plt.show()
-        #plt.xticks()
-        print(df['z_pred_2'].value_counts())
+        # #plt.xticks()
+        # print(df['z_pred_2'].value_counts())
 
-preprocessed_path = os.path.join(OUTPUT_PATH, 'preprocessed.csv')
+
+preprocessed_path = os.path.join(OUTPUT_PATH, 'test_preprocessed.csv')
 
 if __name__ == '__main__':
     df = pd.read_csv(preprocessed_path).head(100000)
@@ -479,8 +615,11 @@ if __name__ == '__main__':
     df['z'] = df.apply(lambda x: np.array([x[col] for col in intervention_cols]), axis=1)
     df['z_id'] = df['z'].apply(lambda x: 0 if np.sum(x)==0 else intervention_vals[np.argmax(x)])
 
+    map_to_idx = lambda x: {v: i for i, v in enumerate(intervention_vals)}[x]
+
     df = df.loc[~df['z_id'].isna(), :]
     df['z_id'] = df['z_id'].astype(int)
+    df['z_idx'] = df['z_id'].apply(map_to_idx)
 
     df_train, df_test = train_test_split(df, test_size=0.2, random_state=4
                                          , shuffle=True)
@@ -495,24 +634,31 @@ if __name__ == '__main__':
     df_interv_descs = df_map[[f'{intervention_var_name}_desc_map',f'{intervention_var_name}_map']]
     interv_desc = {row.iloc[1]: row.iloc[0] for _, row in df_interv_descs.drop_duplicates().iterrows()}
 
-    clusterer = CustomClustering(k=3, y_col_name=outcome_col_name, possible_interventions=intervention_vals, treatment_desc=interv_desc)
+    clusterer = CustomClustering(k=3, y_col_name=outcome_col_name,
+                                 possible_interventions=intervention_vals,
+                                 treatment_desc=interv_desc,
+                                 intervention_cols=intervention_cols
+    )
 
     clusterer.fit(df_train, clust_cols, knn_cols)
 
-    clusterer.prescribe_separately(df_test.head(2000))
+    NUM_PRESCRIPTIONS = 1500
+    df_prescr = df_test.head(NUM_PRESCRIPTIONS)
+
+    clusterer.prescribe_separately(df_prescr)
 
 
-    exit(0)
-    p = KNNPredictor(outcome_col_name)
-
-    knn_cols_m = list(find_col_names_from_dummy_cols(df_train, knn_cols).keys())
-    #print(knn_cols_m)
-    p.fit(df_train.loc[:, knn_cols_m + [outcome_col_name]])
-    p.evaluate(df_test.loc[:, knn_cols_m + [outcome_col_name]])
+    # exit(0)
+    # p = KNNPredictor(outcome_col_name)
+    #
+    # knn_cols_m = list(find_col_names_from_dummy_cols(df_train, knn_cols).keys())
+    # #print(knn_cols_m)
+    # p.fit(df_train.loc[:, knn_cols_m + [outcome_col_name]])
+    # p.evaluate(df_test.loc[:, knn_cols_m + [outcome_col_name]])
     #df_test['cluster'] = clusterer.predict(df_test).tolist()
 
     #print('hi')
-    #clusterer.visualize_cluster(df_test)
+    clusterer.visualize_cluster(df_test)
 
     # y_train = clusters.reshape((-1))
 
