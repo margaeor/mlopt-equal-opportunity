@@ -10,6 +10,7 @@ seed = 2
 gurobi_env = Gurobi.Env()
 Random.seed!(seed)
 
+
 df_path = "data/output/preprocessed.csv"
 predictor_col = "income_total"
 normalization_type = "std"
@@ -33,7 +34,7 @@ end
 #     return sum((beta0 .+ X*beta .- y).^2)/n
 # end
 
-function grid_search(X, y, solver_func, error_func, error_strategy="Min",train_val_ratio=0.7;params... )
+function grid_search(X, y, solver_func, error_func, groups, groupKs, error_strategy="Min",train_val_ratio=0.7; params... )
 
     # Split the data into training/validation
     X_train, y_train, X_val, y_val = partitionTrainTest(X, y, train_val_ratio);
@@ -49,19 +50,20 @@ function grid_search(X, y, solver_func, error_func, error_strategy="Min",train_v
     error_multiplier = error_strategy == "Min" ? 1 : -1
     best_error = Inf # We consider minimization
     best_param_set = []
-    println("----------------------------------------")
-    
-    println(param_combinations)
-    println("----------------------------------------")
+    # println("----------------------------------------")    
+    # println(param_combinations)
+    # println("----------------------------------------")
+    # println(param_combinations)
 
-    println(param_combinations)
+
     # Iterate over all combinations of parameters
     for param_comb in param_combinations
         println("**********************")
         println(param_comb)
+        println("**********************")
         
         # Optimize model and find optimal variables
-        global model_vars = solver_func(X_train,y_train;param_comb...)
+        global model_vars = solver_func(X_train,y_train, groups, groupKs;param_comb...)
         
         # Evaluate model error on validation set
         if model_vars isa Tuple
@@ -80,43 +82,93 @@ function grid_search(X, y, solver_func, error_func, error_strategy="Min",train_v
     
     # Retrain the model on the whole training set 
     # using the best set of params
-    # model_vars = solver_func(X,y;best_param_set...)
+    model_vars = solver_func(X,y;best_param_set...)
     
     # Return the model variable and the best params
     return model_vars, best_param_set
 end
 
-function solve_holistic_regr(X,y;gamma,rho,k, outFlag = 1)
+
+
+
+
+
+
+
+
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
+function solve_holistic_regr(X,y, groups, groupKs;gamma,rho,k, outFlag = 1)
     C = cor(X)
     n,p = size(X)
-    X_aug = augment_X(X)
+    X_aug = augment_X(X, true)
     M = 10^5
     # m = Model(with_optimizer(Gurobi.Optimizer, gurobi_env))
     m = Model(with_optimizer(Gurobi.Optimizer))
     set_optimizer_attribute(m, "OutputFlag", outFlag)
-    set_optimizer_attribute(m, "PSDTol", 10)
-    set_optimizer_attribute(m, "TimeLimit", 300)
+    set_optimizer_attribute(m, "PSDTol", 1)
+    # set_optimizer_attribute(m, "NonConvex", 2)
+    set_optimizer_attribute(m, "TimeLimit", 120)
     @variable(m, beta[1:(p+1)])
     @variable(m, z[1:p],Bin)
     @variable(m, t[1:p])
     @objective(m, Min, 1/2*sum((X_aug*beta.-y).^2)+gamma*sum(t[i] for i=1:p))
+    # @objective(m, Min, sum((X_aug*beta).^2))
     @constraint(m, [i=1:p], t[i]>= beta[i])
     @constraint(m, [i=1:p], t[i]>= -beta[i])
     @constraint(m, [i=1:p], beta[i]<= M*z[i])
     @constraint(m, [i=1:p], -M*z[i]<=beta[i])
     @constraint(m, sum(z)<=k)
-    #@constraint(m, [i=1:4:p-3], sum(z[i+j] for j=0:3)<=1)
-    #     for i in 1:p
-    #         for j in i+1:p
-    #             if abs(C[i,j]) > rho
-    #                 @constraint(m, z[i]+z[j] <= 1)
-    #             end
-    #         end
-    #     end
+
+    for (index, group) in enumerate(groups)
+        @constraint(m, sum(z[i] for i in group)<=groupKs[index])
+    end
+
+    # @constraint(m, [i=1:p], sum(z[i+j] for j=0:3)<=1)
+    for i in 1:p
+        for j in i+1:p
+            if abs(C[i,j]) > rho
+                @constraint(m, z[i]+z[j] <= 1)
+            end
+        end
+    end
+
     optimize!(m)
     return JuMP.value.(beta)
 end
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
 
+function printFeatures(betas, cols, isGroups = 0; groups)    
+    if isGroups
+        for (index, group) in enumerate(groups)
+            println("Features selected from Group $(index) :")  
+            
+            # sortperm(abs.(betas[2:end]), rev=true)
+            grpCounter = 0
+            tmpBetas = betas_holistic[sort!(collect(group))]
+            tmpCols = cols[sort!(collect(group))]
+            for i in sortperm(abs.(tmpBetas), rev=true)
+                if tmpBetas[i] != 0
+                    grpCounter = grpCounter + 1;
+                    println("$i - $(tmpBetas[i]) - $(tmpCols[i])")
+                end
+            end
+            println("Total: $(grpCounter) Features from Group $(index)")
+            println("--------------------------------------------------")
+        end
+    else
+        THRESHOLD = 0.000001
+        for i in sortperm(abs.(betas[2:end]), rev=true)
+            if abs(betas[i+1])<=THRESHOLD
+                continue
+            end
+            println("- $(cols[i]) : $(betas[i+1])")
+        end
+    end 
+end
 
 function normalize_data(X, method="minmax"; is_train=true)
     X = copy(X)
@@ -142,8 +194,12 @@ function partitionTrainTest(X,y, at = 0.7, s=seed)
     return X[train_idx,:], y[train_idx], X[test_idx,:], y[test_idx]
 end
 
-function augment_X(X)
-    return [ones(size(X,1),1) X]
+function augment_X(X, flag = false)
+    if flag
+        return [X ones(size(X,1),1)]
+    else        
+        return [ones(size(X,1),1) X]
+    end
 end
 
 
@@ -248,7 +304,7 @@ end
 
 df = DataFrame(CSV.File(df_path, header=1))
 # df = last(df, 1000)
-df = df[shuffle(1:nrow(df))[1:100000], :]
+df = df[shuffle(1:nrow(df))[1:10000], :]
 
 names(df)
 
@@ -270,7 +326,7 @@ excluded_cols = [
     "gross_rent",
     "person_number",
     "rent_monthly",
-    "property_value",
+    # "property_value",
     "mortgage_first_payment",
     "gross_rent_pcnt_income",
     "electricity_cost",
@@ -354,16 +410,86 @@ println("mse train $(calc_mse(X_train, y_train, betas_iai))")
 println("mse test $(calc_mse(X_test, y_test, betas_iai))")
 
 
-THRESHOLD = 0.000001
-for i in sortperm(abs.(betas_iai[2:end]), rev=true)
-    if abs(betas_iai[i+1])<=THRESHOLD
-        continue
+# THRESHOLD = 0.000001
+# for i in sortperm(abs.(betas_iai[2:end]), rev=true)
+#     if abs(betas_iai[i+1])<=THRESHOLD
+#         continue
+#     end
+#     println("- $(cols[i]) : $(betas_iai[i+1])")
+# end
+
+printFeatures(betas_iai, cols)
+
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
+seed = 4
+Nhol = 5000
+grpAll = Set(1:length(cols))
+fodInit = 205; fodEnd = 241
+ # FIELD OF DEGREE GROUP ------------------------------- 1
+grp1 = Set(fodInit:fodEnd)
+socInit = 102; socEnd = 127
+# OCCUPATION CODE GROUP -------------------------------- 2
+grp2 = Set(socInit:socEnd) 
+# A-PRIORI TRAITS (Sex, Race, Disabilities) GROUP ------ 3
+# SEX GROUP
+sexInit = 173; sexEnd = 175;
+sexGrp = Set(sexInit:sexEnd)
+# DISABILITIES GROUP
+disInit1 = 9; disEnd1 = 11;
+disInit2 = 170; disEnd2 = 172;
+disGrp = union(Set(disInit1:disEnd1), Set(disInit2:disEnd2))
+# RACE GROUP
+raceInit = 137; raceEnd = 163;
+raceGrp = Set(raceInit:raceEnd)
+# UNITE ALL
+grp3 = union(raceGrp, disGrp, sexGrp)
+
+
+grp4 = setdiff(grpAll, union(grp1, grp2, grp3))
+
+groups = [grp1 grp2 grp3 grp4]
+groupKs = [30 25 30 25]
+global indexArr = Int[]
+global nzArr = Int[]
+global rsqArr = Float64[]
+
+# for seed = [19]
+cols = filter(x -> x ∉ excluded_cols, names(df))
+
+    Random.seed!(seed)
+    df2 = df[shuffle(1:nrow(df))[1:Nhol], :]
+    X, y = Matrix{Float32}(df2[!, filter(x -> x != predictor_col, cols)]), df2[!,predictor_col]
+    X_train, y_train, X_test, y_test = partitionTrainTest(X, y, 0.7);
+    X_train = normalize_data(X_train, normalization_type; is_train=true);
+    X_test = normalize_data(X_test, normalization_type; is_train=false);
+
+    try
+        betas_holistic, params_holistic = grid_search(X_train, y_train, solve_holistic_regr, calc_r2,  groups, groupKs , "Max", 0.7; gamma=[0.5 1], rho=[0.5 0.7], k=[50 75])
+        println("Workeed -- $(seed)")
+        nzeros = (length(betas_holistic[betas_holistic .!= 0]))
+        println("NONZEROS = $(length(betas_holistic[betas_holistic .!= 0]))")
+        push!(indexArr, seed)
+        push!(nzArr, nzeros)
+
+        betas_holistic2 = [betas_holistic[end] ; betas_holistic[1:end-1]]
+        r2_c = calc_r2(X_test, y_test, betas_holistic2)
+        push!(rsqArr, r2_c)
+    catch
+        println("Error (probably psd) -- $(seed)")
     end
-    println("- $(cols[i]) : $(betas_iai[i+1])")
+# end
+
+############################################################################################### 
+printFeatures(betas_holistic, cols, true; groups)
+###############################################################################################
+betas_holistic2 = [betas_holistic[end] ; betas_holistic[1:end-1]]
+
+r2_c = calc_r2(X_test, y_test, betas_holistic2)
+mse_c = calc_mse(X_test, y_test, betas_holistic2)
+
+for i in 1:length(cols)
+    println("$i - $(cols[i])")
 end
 
-
-betas_holistic, params_holistic = grid_search(X_train, y_train, solve_holistic_regr, calc_r2, "Max", 0.7; gamma=[0.1], rho=[0.7], k=[20])
-
-model_vars = solve_holistic_regr(X_train,y_train;param_comb...)
-        
