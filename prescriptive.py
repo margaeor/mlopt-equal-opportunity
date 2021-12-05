@@ -31,6 +31,7 @@ from plotly.colors import DEFAULT_PLOTLY_COLORS
 
 np.random.seed(100)
 random.seed(42)
+EXPORT = True
 
 sns.set_theme(style="darkgrid")
 
@@ -507,6 +508,8 @@ class CustomClustering:
             if i<3:
                 df[f'z_pred_{i}_idx'] = df[f'z_pred_{i}'].apply(map_to_idx)
                 df[f'z_pred_{i}_desc'] = df[f'z_pred_{i}'].apply(map_to_name)
+                df['estimated_income'] = df.apply(lambda x: y_knn_all[x.name, x[f'z_pred_{i}_idx']], axis=1)
+                df[f'profit_{i}'] = df['estimated_income'] - df[self.outcome_col]
             else:
                 df[f'z_pred_{i}_idx'] = df[f'z_pred_{i}'].apply(lambda x: [map_to_idx(j) for j in x])
                 df[f'z_pred_{i}_desc'] = df[f'z_pred_{i}'].apply(lambda x: [map_to_name(j) for j in x])
@@ -520,7 +523,8 @@ class CustomClustering:
 
         ax = sns.countplot(x="z_id_desc", data=self.df_train, order=label_order)
         plt.xticks(rotation=45)
-        plt.title('Original Distribution')
+        plt.title('Original Occupation Distribution')
+        if EXPORT: plt.savefig(f'exports/distr_orig.eps')
         plt.show()
 
         for i in range(len(rho_list)):
@@ -528,8 +532,10 @@ class CustomClustering:
             df['tmp'] = df[f'z_pred_3_desc'].apply(lambda x: x[i])
             ax = sns.countplot(x="tmp", data=df, order=label_order)
             plt.xticks(rotation=45)
-            plt.title(rf'Occupation distribution in test: $\rho={rho}$')
+            plt.title(rf'Prescripted distribution in test: $\rho={rho}$')
+            if EXPORT: plt.savefig(f'exports/distr_{rho}.eps')
             plt.show()
+
 
         self.calculate_prediction_tradedoffs(df, rho_list, y_knn_all)
 
@@ -545,6 +551,9 @@ class CustomClustering:
         #plt.xscale('log')
         #plt.yscale('log')
         plt.xlabel(r'$\rho$')
+        plt.ylabel('Mean profit (\$/year/person)')
+        plt.title('Expected income increase after prescription')
+        if EXPORT: plt.savefig('exports/profits.eps')
         plt.show()
         print('hi')
 
@@ -579,15 +588,22 @@ class CustomClustering:
         [ax.set_xlabel('Occupation Category') for ax in plt.gcf().axes]
         plt.show()
 
-        # ax = sns.countplot(x="z_pred_2_desc", data=df, order=label_order)
-        # plt.xticks(rotation=45)
-        # plt.title('Occupation distribution in test: Prescription 2')
-        # plt.show()
-        #
-        # ax = sns.countplot(x="z_pred_3_desc", data=df, order=label_order)
-        # plt.xticks(rotation=45)
-        # plt.title('Occupation distribution in test: Prescription 3')
-        # plt.show()
+        print("Method 1 ", df['profit_1'].mean())
+        ax = sns.countplot(x="z_pred_1_desc", data=df, order=label_order)
+        plt.xticks(rotation=45)
+        plt.title('Occupation distribution in test: Prescription 1')
+        plt.show()
+
+        print("Method 2 ", df['profit_2'].mean())
+        ax = sns.countplot(x="z_pred_2_desc", data=df, order=label_order)
+        plt.xticks(rotation=45)
+        plt.title('Occupation distribution in test: Prescription 2')
+        plt.show()
+
+        ax = sns.countplot(x="z_pred_3_desc_chosen", data=df, order=label_order)
+        plt.xticks(rotation=45)
+        plt.title('Occupation distribution in test: Prescription 3')
+        plt.show()
 
         # ax = sns.countplot(x="z_id_desc", data=df)
         # sns.catplot(x="z_id_desc", col="cluster", data=df, kind="count", height=4, aspect=1,
@@ -601,7 +617,7 @@ class CustomClustering:
         # print(df['z_pred_2'].value_counts())
 
 
-preprocessed_path = os.path.join(OUTPUT_PATH, 'test_preprocessed.csv')
+preprocessed_path = os.path.join(OUTPUT_PATH, 'preprocessed.csv')
 
 if __name__ == '__main__':
     df = pd.read_csv(preprocessed_path).head(100000)
@@ -634,7 +650,7 @@ if __name__ == '__main__':
     df_interv_descs = df_map[[f'{intervention_var_name}_desc_map',f'{intervention_var_name}_map']]
     interv_desc = {row.iloc[1]: row.iloc[0] for _, row in df_interv_descs.drop_duplicates().iterrows()}
 
-    clusterer = CustomClustering(k=3, y_col_name=outcome_col_name,
+    clusterer = CustomClustering(k=20, y_col_name=outcome_col_name,
                                  possible_interventions=intervention_vals,
                                  treatment_desc=interv_desc,
                                  intervention_cols=intervention_cols

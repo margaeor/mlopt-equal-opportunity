@@ -29,10 +29,25 @@ from sklearn import linear_model
 from plotly.subplots import make_subplots
 from plotly.colors import DEFAULT_PLOTLY_COLORS
 
+def split_in_half_space(s):
+
+    num_spaces = s.count(' ')
+
+    parts = s.split(' ')
+
+    ss = ''
+    for i,p in enumerate(parts):
+        ss += ' ' + p
+
+        if len(parts) > 1 and i == num_spaces//2:
+            ss += '<br>'
+
+
+    return ss
 
 if __name__ == '__main__':
 
-    betas_file = os.path.join('data', 'betas_iai1.csv')
+    betas_file = os.path.join('data','weights', 'betas_iai1.csv')
     df = pd.read_csv(betas_file)
 
     df_meta = pd.read_csv(METADATA_FILE)
@@ -43,6 +58,7 @@ if __name__ == '__main__':
     fig = make_subplots(
         rows=2, cols=N_COLS,
         specs=[[{'rowspan': 2}, {},{'rowspan': 2}], [None, {}, None]],
+        horizontal_spacing=0.01
         #subplot_titles=titles
     )
 
@@ -53,8 +69,8 @@ if __name__ == '__main__':
     ]
 
     assignments = [
-        (1,2),
         (1,3),
+        (1,2),
         (2,2),
         (1,1)
     ]
@@ -83,21 +99,22 @@ if __name__ == '__main__':
             intervention_vals = [v for v in intervention_vals if not pd.isna(v)]
             #new_names = [mapper[val] for i, val in enumerate(intervention_vals)]
 
-            cola, colb = f'{og_col}_map', f'{og_col}_desc_map'
+            cola, colb = f'{og_col}_map', f'{og_col}_desc_map2'
             mapper = {a: b for _, (a, b) in df_cols.loc[:, [cola, colb]].drop_duplicates().iterrows()}
             final_mapper = {intervention_cols[i]:mapper[val] for i, val in enumerate(intervention_vals)}
-
+            print(final_mapper)
         else:
-            final_mapper = {b:b for _,(a, b) in df.loc[:, [beta_col, name_col]].drop_duplicates().iterrows()}
+            df_tmp = pd.read_csv(os.path.join('data','weights','hol_map.csv'))
+            final_mapper = {a:b for _,(a, b) in df_tmp.loc[:, ['key', 'value']].drop_duplicates().iterrows() if not pd.isna(b) and 'nan' not in b}
 
         df_new = df[[beta_col, name_col]].dropna()
         df_new['abs_beta'] = df_new[beta_col].abs()
         df_new = df_new.loc[df_new[name_col].isin(final_mapper)]\
             .sort_values(by='abs_beta', ascending=False)\
-            .head(30)\
+            .head(10)\
             .sort_values(by=beta_col,ascending=True)
 
-        df_new["Color"] = np.where(df_new[beta_col] < 0, 'red', 'green')
+        df_new["Color"] = np.where(df_new[beta_col] < 0, 'rgba(200,0,3,0.8)', 'rgba(9,129,74,0.8)')
 
         row = idx//N_COLS+1
         col = idx%N_COLS+1
@@ -105,14 +122,23 @@ if __name__ == '__main__':
         col = assignments[idx][1]
         #if i ==4: col += 1
         #fig = go.Figure()
+        y_vals = df_new[name_col].apply(lambda x: split_in_half_space(final_mapper[x]))
         fig.add_trace(
             go.Bar(name='Net',
-                   y=df_new[name_col].apply(lambda x: final_mapper[x]),
+                   y=y_vals,#.replace(' ','<br>') if final_mapper[x].count(' ')<2 else final_mapper[x]),
                    x=df_new[beta_col],
-                   marker_color=df_new['Color'], orientation='h'),row ,col)#(i-1)//2+1, (i-1)%2+1)
+                   text=y_vals,
+                   #textposition="inside",
+                   #insidetextanchor="start",
+
+                   #showlegend=False,
+                   marker_color=df_new['Color'], orientation='h'),row ,col)#(i-1)//2+1, (i-1)%2+1),
+
 
         idx += 1
-    fig.update_layout(barmode='stack')
+    fig.update_layout(barmode='stack',showlegend=False)#,template="plotly_dark"
+    fig.update_yaxes(showticklabels=False)
+    fig.write_image('exports/sparse.svg',scale=2, width=1200, height=600)
     pyo.plot(fig)
 
 
