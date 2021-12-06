@@ -504,31 +504,24 @@ global nzArr = Int[]
 global rsqArr = Float64[]
 
 
-for trial = 4:4
-    cols = filter(x -> x ∉ excluded_cols, names(df))
-    Random.seed!(trial)
-    df2 = df[shuffle(1:nrow(df))[1:Nhol], :]
-    X, y = Matrix{Float32}(df2[!, filter(x -> x != predictor_col, cols)]), df2[!,predictor_col]
-    X_train, y_train, X_test, y_test = partitionTrainTest(X, y, 0.7);
-    X_train = normalize_data(X_train, normalization_type; is_train=true);
-    X_test = normalize_data(X_test, normalization_type; is_train=false);
+cols = filter(x -> x ∉ excluded_cols, names(df))
+Random.seed!(seed)
+df2 = df[shuffle(1:nrow(df))[1:Nhol], :]
+X, y = Matrix{Float32}(df2[!, filter(x -> x != predictor_col, cols)]), df2[!,predictor_col]
+X_train, y_train, X_test, y_test = partitionTrainTest(X, y, 0.7);
+X_train = normalize_data(X_train, normalization_type; is_train=true);
+X_test = normalize_data(X_test, normalization_type; is_train=false);
 
-    # try
-        # betas_holistic, params_holistic = grid_search(X_train, y_train, solve_holistic_regr, calc_r2,  groups, groupKs , "Max", 0.7; gamma=[0.5 1], rho=[0.5 0.7], k=[50 75])
-        betas_holistic, params_holistic = grid_search(X_train, y_train, solve_holistic_regr, calc_r2,  groups, groupKs , "Max", 0.7; gamma=[0.5], rho=[0.5], k=[75])
-        println("Workeed -- $(seed)")
-        nzeros = (length(betas_holistic[betas_holistic .!= 0]))
-        println("NONZEROS = $(length(betas_holistic[betas_holistic .!= 0]))")
-        push!(indexArr, seed)
-        push!(nzArr, nzeros)
-        betas_holistic2 = [betas_holistic[end] ; betas_holistic[1:end-1]]
-        r2_c = calc_r2(X_test, y_test, betas_holistic2)
-        push!(rsqArr, r2_c)
-        println("R2 = $(r2_c)")
-    # catch
-        # println("Error (probably psd) -- $(seed)")
-    # end
-end
+betas_holistic, params_holistic = grid_search(X_train, y_train, solve_holistic_regr, calc_r2,  groups, groupKs , "Max", 0.7; gamma=[0.5 1], rho=[0.5 0.7], k=[50 75])
+println("Workeed -- $(seed)")
+nzeros = (length(betas_holistic[betas_holistic .!= 0]))
+println("NONZEROS = $(length(betas_holistic[betas_holistic .!= 0]))")
+push!(indexArr, seed)
+push!(nzArr, nzeros)
+betas_holistic2 = [betas_holistic[end] ; betas_holistic[1:end-1]]
+r2_c = calc_r2(X_test, y_test, betas_holistic2)
+push!(rsqArr, r2_c)
+println("R2 = $(r2_c)")
 
 ############################################################################################### 
 printFeatures(betas_holistic, cols, true; groups)
