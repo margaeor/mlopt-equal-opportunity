@@ -4,8 +4,11 @@
 
 1. Download zip from [ACS 2019 per-person data](https://www2.census.gov/programs-surveys/acs/data/pums/2019/1-Year/csv_pus.zip)
 2. Extract the zip to the `data/dataset` folder
-3. Run create_data.py and find the output csv in `data/output`
+3. Run `create_data.py` and find the output csv in `data/output`
 
+## Preprocessing data
+
+1. Run `preprocess_data.py` and find the preprocessed csv in `data/output`
 
 ## Creating test data for debugging
 
@@ -16,7 +19,7 @@
 
 ## Running Sparse and Holistic Regression
 
-The sparse and holistic regression frameworks are written in Sparsity.jl, but for demonstration purposes you can use Sparsity.ipynb. It was tested on `Julia 1.6.3`.
+The sparse and holistic regression frameworks are written in Sparsity.jl, but for demonstration purposes you can use Sparsity.ipynb. It was tested on `Julia 1.6.3`. Create and preprocess the data first. 
 
 1. Open `Sparsity.ipynb` notebook.
 2. Run all
