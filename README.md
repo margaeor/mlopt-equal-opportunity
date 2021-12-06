@@ -1,5 +1,11 @@
 # ML-OPT Equal Opportunities
 
+
+## Column mappings
+If you want to see a comprehensive list of what
+each occupation code represents in the visualizations (e.g. MGR, BUS),
+take a look at the column SOCP_desc of the file `data/metadata/mapping.csv`
+
 ## Creating data
 
 1. Download zip from [ACS 2019 per-person data](https://www2.census.gov/programs-surveys/acs/data/pums/2019/1-Year/csv_pus.zip)
@@ -37,8 +43,4 @@ Note that the file has a lot of python requirements,
 such as numpy, seaborn, XGBoost, plotly, pandas.
 
 
-## Column mappings
-If you want to see a comprehensive list of what
-each occupation code represents in the visualizations (e.g. MGR, BUS),
-take a look at the column SOCP_desc of the file `data/metadata/mapping.csv`
  
