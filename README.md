@@ -12,3 +12,11 @@
 1. Enter `data/dataset` folder
 2. Run bash script `./create_test_data.sh 100` , where 100 the number of samples
 3. Alternatively, run `./create_test_data_random.sh` to get a random 0.1% subset of the rows
+
+
+## Running Sparse and Holistic Regression
+
+The sparse and holistic regression frameworks are written in Sparsity.jl, but for demonstration purposes you can use Sparsity.ipynb. It was tested on `Julia 1.6.3`.
+
+1. Open `Sparsity.ipynb` notebook.
+2. Run all
