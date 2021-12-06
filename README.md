@@ -23,3 +23,14 @@ The sparse and holistic regression frameworks are written in Sparsity.jl, but fo
 
 1. Open `Sparsity.ipynb` notebook.
 2. Run all
+
+## Running the Prescriptive part
+
+In order to run the prescriptive part
+of the project, first run the
+`create_data.py` and the `preprocess_data.py`
+scripts.
+Then, you can run the `prescriptive.py` 
+file to create and visualize the prescriptions.
+Note that the file has a lot of python requirements,
+such as numpy, seaborn, XGBoost, plotly, pandas.
