@@ -443,6 +443,7 @@ class CustomClustering:
 
 
         for i, rho in enumerate(rho_vals):
+            ###################HEREE
             df['estimated_income'] = df.apply(lambda x: y_knn_all[x.name, x['z_pred_3_idx'][i]], axis=1)
             #df['estimated_income'] = df.apply(lambda x: y_knn_all[x.name, x['z_idx']], axis=1)
             df[f'profit_{i}'] = df['estimated_income']-df[self.outcome_col]
@@ -509,7 +510,7 @@ class CustomClustering:
                 df[f'z_pred_{i}_idx'] = df[f'z_pred_{i}'].apply(map_to_idx)
                 df[f'z_pred_{i}_desc'] = df[f'z_pred_{i}'].apply(map_to_name)
                 df['estimated_income'] = df.apply(lambda x: y_knn_all[x.name, x[f'z_pred_{i}_idx']], axis=1)
-                df[f'profit_{i}'] = df['estimated_income'] - df[self.outcome_col]
+                df[f'profit_{i}p'] = df['estimated_income'] - df[self.outcome_col]
             else:
                 df[f'z_pred_{i}_idx'] = df[f'z_pred_{i}'].apply(lambda x: [map_to_idx(j) for j in x])
                 df[f'z_pred_{i}_desc'] = df[f'z_pred_{i}'].apply(lambda x: [map_to_name(j) for j in x])
@@ -588,21 +589,23 @@ class CustomClustering:
         [ax.set_xlabel('Occupation Category') for ax in plt.gcf().axes]
         plt.show()
 
-        print("Method 1 ", df['profit_1'].mean())
+        print("Method 1 ", df['profit_1p'].mean())
         ax = sns.countplot(x="z_pred_1_desc", data=df, order=label_order)
         plt.xticks(rotation=45)
-        plt.title('Occupation distribution in test: Prescription 1')
+        plt.title('Occupation distribution in test: Framework 1.1')
+        if EXPORT: plt.savefig('exports/distr_p1.eps')
         plt.show()
 
-        print("Method 2 ", df['profit_2'].mean())
+        print("Method 2 ", df['profit_2p'].mean())
         ax = sns.countplot(x="z_pred_2_desc", data=df, order=label_order)
         plt.xticks(rotation=45)
-        plt.title('Occupation distribution in test: Prescription 2')
+        plt.title('Occupation distribution in test: Framework 1.2')
+        if EXPORT: plt.savefig('exports/distr_p2.eps')
         plt.show()
 
         ax = sns.countplot(x="z_pred_3_desc_chosen", data=df, order=label_order)
         plt.xticks(rotation=45)
-        plt.title('Occupation distribution in test: Prescription 3')
+        plt.title('Occupation distribution in test: Framework 2')
         plt.show()
 
         # ax = sns.countplot(x="z_id_desc", data=df)
@@ -650,7 +653,7 @@ if __name__ == '__main__':
     df_interv_descs = df_map[[f'{intervention_var_name}_desc_map',f'{intervention_var_name}_map']]
     interv_desc = {row.iloc[1]: row.iloc[0] for _, row in df_interv_descs.drop_duplicates().iterrows()}
 
-    clusterer = CustomClustering(k=20, y_col_name=outcome_col_name,
+    clusterer = CustomClustering(k=4, y_col_name=outcome_col_name,
                                  possible_interventions=intervention_vals,
                                  treatment_desc=interv_desc,
                                  intervention_cols=intervention_cols
