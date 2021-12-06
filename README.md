@@ -22,7 +22,8 @@
 The sparse and holistic regression frameworks are written in Sparsity.jl, but for demonstration purposes you can use Sparsity.ipynb. It was tested on `Julia 1.6.3`. Create and preprocess the data first. 
 
 1. Open `Sparsity.ipynb` notebook.
-2. Run all
+2. Run all (Will take up to 15-20 minutes)
+
 
 ## Running the Prescriptive part
 
